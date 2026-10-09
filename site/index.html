@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Simulate and visualize teach-pendant .ls robot programs in the browser.">
+<style>[hidden]{display:none!important} img{max-width:100%} body{margin:0}</style>
+<title>Pendant Path Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: pendant-style workbench. 3D cell on the left, paper + program listing on the right, findings and settings below. */
+:root {
+  --bg: #e7eaed; --panel: #f7f8f9; --panel-2: #eef1f3; --line: #cdd3d9; --fg: #1a1e23; --muted: #5b6570;
+  --accent: #e3a600; --accent-ink: #1a1e23; --paper: #fcfcfa; --ink: #1f252c; --grid: #e6e9ec; --grid2: #cfd5db;
+  --mJ: #d4540f; --mL: #1f6fc2; --mC: #7a4fd8; --mB: #8a939c; --bad: #cf3434; --warn: #b87400; --ok: #2f9e44;
+  --robot: #e2ad0b; --robot-2: #59636d; --scene: #dde2e6;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "Barlow", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111418; --panel: #191d22; --panel-2: #20252b; --line: #2d343c; --fg: #e3e7eb; --muted: #97a1ab;
+  --accent: #f2c230; --accent-ink: #111418; --paper: #1f242a; --ink: #eef1f4; --grid: #262c33; --grid2: #353d46;
+  --mJ: #ff7c40; --mL: #52a3f2; --mC: #a98cfa; --mB: #7f8992; --bad: #ff6b6b; --warn: #f0aa2c; --ok: #55d06b;
+  --robot: #d9a710; --robot-2: #7d8893; --scene: #161a1f; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #111418; --panel: #191d22; --panel-2: #20252b; --line: #2d343c; --fg: #e3e7eb; --muted: #97a1ab;
+  --accent: #f2c230; --accent-ink: #111418; --paper: #1f242a; --ink: #eef1f4; --grid: #262c33; --grid2: #353d46;
+  --mJ: #ff7c40; --mL: #52a3f2; --mC: #a98cfa; --mB: #7f8992; --bad: #ff6b6b; --warn: #f0aa2c; --ok: #55d06b;
+  --robot: #d9a710; --robot-2: #7d8893; --scene: #161a1f; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--f-body); padding-inline: 16px; padding-block: 14px 40px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 14px; }
+header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { font: 700 26px/1 var(--f-display); letter-spacing: .02em; margin: 0; text-transform: uppercase; }
+.brand .tag { font: 500 12px var(--f-mono); color: var(--muted); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; align-items: center; }
+.tab { font: 600 14px var(--f-mono); padding: 6px 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 4px; cursor: pointer; }
+.tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tab:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, li[data-line]:focus-visible { outline: 2px solid var(--mL); outline-offset: 2px; }
+.btn { font: 600 13px var(--f-body); letter-spacing: .02em; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.grid-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 14px; }
+.grid-main > section.panel { display: flex; flex-direction: column; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.panel-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.panel-h h2 { font: 600 14px var(--f-display); letter-spacing: .09em; text-transform: uppercase; margin: 0; color: var(--muted); }
+.panel-h .sub { font: 500 12px var(--f-mono); color: var(--muted); }
+#view3d { position: relative; flex: 1 1 auto; min-height: 500px; background: var(--scene); border-radius: 0 0 6px 6px; overflow: hidden; touch-action: none; }
+#view3d canvas { display: block; }
+.readout { position: absolute; left: 10px; top: 10px; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font: 12px/1.5 var(--f-mono); font-variant-numeric: tabular-nums; pointer-events: none; min-width: 210px; }
+.readout .cur { font-weight: 600; font-size: 13px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.readout .rows { display: grid; grid-template-columns: auto auto auto; gap: 0 12px; }
+.readout .k { color: var(--muted); }
+.pen { display: inline-block; margin-top: 4px; font-weight: 600; padding: 1px 6px; border-radius: 3px; font-size: 11px; letter-spacing: .05em; }
+.pen.down { background: var(--ink); color: var(--paper); }
+.pen.up { border: 1px solid var(--line); color: var(--muted); }
+.pen.crash { background: var(--bad); color: #fff; }
+.legend { position: absolute; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; font: 11px var(--f-mono); background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; pointer-events: none; max-width: calc(100% - 20px); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.transport .play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 78px; }
+#scrub { flex: 1 1 220px; accent-color: var(--accent); min-width: 140px; }
+.time { font: 500 13px var(--f-mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.speeds { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.speeds button { font: 500 12px var(--f-mono); border: 0; padding: 5px 8px; background: var(--panel); color: var(--fg); cursor: pointer; border-right: 1px solid var(--line); }
+.speeds button:last-child { border-right: 0; }
+.speeds button[aria-pressed="true"] { background: var(--fg); color: var(--panel); }
+.side { display: grid; gap: 14px; grid-template-rows: auto 1fr; min-width: 0; }
+#paperWrap { padding: 10px; }
+#paper { width: 100%; aspect-ratio: 5 / 4; display: block; border-radius: 3px; max-width: 100%; }
+.paper-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; font: 12px var(--f-mono); color: var(--muted); padding: 0 12px 10px; }
+.paper-foot label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+#listing { position: relative; list-style: none; margin: 0; padding: 6px 0; font: 13px/1.5 var(--f-mono); max-height: 300px; overflow: auto; }
+#listing li { display: grid; grid-template-columns: 3.2ch 1fr auto; gap: 8px; padding: 2px 12px; cursor: pointer; border-left: 3px solid transparent; }
+#listing li:hover { background: var(--panel-2); }
+#listing li.active { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-left-color: var(--accent); }
+#listing li.nomove { cursor: default; color: var(--muted); }
+#listing .ln { color: var(--muted); text-align: right; }
+#listing code { font: inherit; white-space: pre-wrap; word-break: break-word; }
+#listing .mJ { color: var(--mJ); font-weight: 600; } #listing .mL { color: var(--mL); font-weight: 600; } #listing .mC { color: var(--mC); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+.dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); } .dot.info { background: var(--mL); }
+.grid-low { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.summary { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 12px; border-bottom: 1px solid var(--line); font: 13px var(--f-mono); font-variant-numeric: tabular-nums; }
+.summary b { font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 5px; }
+#issues { list-style: none; margin: 0; padding: 0; }
+#issues li { display: grid; grid-template-columns: 4px 4.5ch 1fr; gap: 10px; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+#issues li:last-child { border-bottom: 0; }
+#issues li:hover { background: var(--panel-2); }
+#issues .stripe { border-radius: 0 2px 2px 0; }
+#issues .stripe.bad { background: var(--bad); } #issues .stripe.warn { background: var(--warn); } #issues .stripe.info { background: var(--mL); }
+#issues .lno { font: 600 12px var(--f-mono); color: var(--muted); padding-top: 2px; }
+#issues .t { font-weight: 600; }
+#issues .d { color: var(--muted); font-size: 14px; max-width: 70ch; }
+.empty { padding: 14px 12px; color: var(--muted); }
+.settings { padding: 12px; display: grid; gap: 14px; }
+.field { display: grid; gap: 4px; }
+.field label, .fl { font: 600 12px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.field .row { display: flex; align-items: center; gap: 10px; }
+.field input[type=range] { flex: 1; accent-color: var(--accent); }
+.num { font: 13px var(--f-mono); width: 7ch; padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper); color: var(--fg); font-variant-numeric: tabular-nums; }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.prgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.prgrid .num { width: 100%; }
+.prgrid span { font: 11px var(--f-mono); color: var(--muted); text-align: center; }
+.loadbox { display: grid; gap: 8px; }
+textarea#paste { width: 100%; min-height: 120px; font: 12px var(--f-mono); padding: 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--fg); resize: vertical; }
+details > summary { cursor: pointer; font: 600 13px var(--f-body); }
+.note { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin: 0; }
+.err { color: var(--bad); font-weight: 600; padding: 10px 12px; }
+@media (max-width: 900px) {
+  .grid-main, .grid-low { grid-template-columns: minmax(0, 1fr); }
+  #view3d { min-height: 400px; }
+  .readout { font-size: 10.5px; min-width: 0; padding: 6px 8px; }
+  .readout .cur { font-size: 11px; max-width: 220px; }
+  .tabs { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Pendant Path Viewer</h1><span class="tag">teach-pendant .ls programs</span></div>
+    <div class="tabs" id="tabs"></div>
+    <label class="btn" for="fileIn">Open .ls…</label>
+    <input type="file" id="fileIn" multiple hidden>
+  </header>
+
+  <div class="grid-main">
+    <section class="panel">
+      <div class="panel-h"><h2>Work cell</h2><span class="sub" id="progMeta"></span></div>
+      <div id="view3d">
+        <div class="readout" id="readout"></div>
+        <div class="legend">
+          <span><i style="background:var(--mJ)"></i>J joint</span>
+          <span><i style="background:var(--mL)"></i>L linear</span>
+          <span><i style="background:var(--mC)"></i>C circular</span>
+          <span><i style="background:var(--mB)"></i>CNT blend</span>
+          <span><i style="background:var(--ink)"></i>ink</span>
+          <span><i style="background:var(--bad)"></i>below surface</span>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="btn play" id="playBtn" type="button">▶ Play</button>
+        <button class="btn" id="restartBtn" type="button" title="Back to start">⏮</button>
+        <button class="btn" id="stepBtn" type="button" title="Jump to next line">Next line ⏭</button>
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Program time">
+        <span class="time" id="timeOut">0.00 / 0.00 s</span>
+        <div class="speeds" id="speeds" role="group" aria-label="Playback speed">
+          <button type="button" data-s="0.25">¼×</button><button type="button" data-s="0.5">½×</button><button type="button" data-s="1" aria-pressed="true">1×</button><button type="button" data-s="2">2×</button><button type="button" data-s="4">4×</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="panel">
+        <div class="panel-h"><h2>Paper · top view</h2><span class="sub">+X ↑ &nbsp; +Y ←</span></div>
+        <div id="paperWrap"><canvas id="paper"></canvas></div>
+        <div class="paper-foot">
+          <label><input type="checkbox" id="showAir" checked> air moves</label>
+          <label><input type="checkbox" id="showGhost" checked> full drawing</label>
+          <span id="gridNote">grid 10 mm</span>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-h"><h2>Program</h2><span class="sub">click a line to jump</span></div>
+        <ol id="listing"></ol>
+      </section>
+    </div>
+  </div>
+
+  <div class="grid-low">
+    <section class="panel">
+      <div class="panel-h"><h2>Findings</h2><span class="sub" id="issueCount"></span></div>
+      <div class="summary" id="summary"></div>
+      <ul id="issues"></ul>
+    </section>
+    <section class="panel">
+      <div class="panel-h"><h2>Settings</h2></div>
+      <div class="settings">
+        <div class="field">
+          <label for="toolLen">Tool length (UTOOL 1, along faceplate Z)</label>
+          <div class="row"><input type="range" id="toolLen" min="0" max="250" step="5" value="100"><input class="num" id="toolLenN" type="number" min="0" max="400" step="1" value="100"> mm</div>
+        </div>
+        <div class="field">
+          <label for="comp">Pen spring travel</label>
+          <div class="row"><input type="range" id="comp" min="0" max="15" step="0.5" value="3"><input class="num" id="compN" type="number" min="0" max="30" step="0.5" value="3"> mm</div>
+          <p class="hint">How far below the surface the tip can go before it counts as a crash.</p>
+        </div>
+        <div class="field" id="prFields"></div>
+        <details class="loadbox">
+          <summary>Paste a program</summary>
+          <textarea id="paste" spellcheck="false" placeholder="/PROG  MYPROG&#10;/MN&#10;   1:J P[1] 100% FINE ;&#10;/POS&#10;P[1]{ … };&#10;/END"></textarea>
+          <button class="btn" id="pasteBtn" type="button">Load pasted program</button>
+        </details>
+        <p class="note">Simulated, not certified. The arm is a generic small 6-axis model (330 mm upper arm, 335 mm forearm) in a front / elbow-up configuration, World frame only. CNT rounding and acceleration are approximations, so cycle times and corner shapes are estimates; use the robot maker’s simulator or the real pendant for exact behavior.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script type="text/plain" id="src-1">/PROG  BOX_AB
+/ATTR
+OWNER		= MNEDITOR;
+COMMENT		= "";
+PROG_SIZE	= 878;
+CREATE		= DATE 26-09-25  TIME 22:04:36;
+MODIFIED	= DATE 26-10-02  TIME 21:50:22;
+FILE_NAME	= ;
+VERSION		= 0;
+LINE_COUNT	= 9;
+MEMORY_SIZE	= 1214;
+PROTECT		= READ_WRITE;
+TCD:  STACK_SIZE	= 0,
+      TASK_PRIORITY	= 50,
+      TIME_SLICE	= 0,
+      BUSY_LAMP_OFF	= 0,
+      ABORT_REQUEST	= 0,
+      PAUSE_REQUEST	= 0;
+DEFAULT_GROUP	= 1,*,*,*,*;
+CONTROL_CODE	= 00000000 00000000;
+LOCAL_REGISTERS	= 0,0,0;
+/APPL
+/APPL
+
+AUTO_SINGULARITY_HEADER;
+  ENABLE_SINGULARITY_AVOIDANCE   : TRUE;
+  CYCLE_REFERENCE = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+  CYCLE_TARGET =   0.00 ;
+/MN
+   1:  UFRAME_NUM=0 ;
+   2:  UTOOL_NUM=1 ;
+   3:J PR[4:HOME_AB] 100% FINE    ;
+   4:J P[2] 60% CNT100    ;
+   5:L P[3] 250mm/sec FINE    ;
+   6:L P[4] max_speed CNT100    ;
+   7:J P[5] 100% CNT25    ;
+   8:L P[6] 250mm/sec FINE    ;
+   9:J PR[4:HOME_AB] 100% FINE    ;
+/POS
+P[2]{
+   GP1:
+	UF : 0, UT : 1,		CONFIG : 'N U T, 0, 0, 0',
+	X =   528.282  mm,	Y =  -134.374  mm,	Z =  -276.854  mm,
+	W =  -179.979 deg,	P =      .045 deg,	R =      .005 deg
+};
+P[3]{
+   GP1:
+	UF : 0, UT : 1,		CONFIG : 'N U T, 0, 0, 0',
+	X =   528.271  mm,	Y =   122.055  mm,	Z =  -276.864  mm,
+	W =  -179.979 deg,	P =      .047 deg,	R =      .005 deg
+};
+P[4]{
+   GP1:
+	UF : 0, UT : 1,		CONFIG : 'N U T, 0, 0, 0',
+	X =   327.621  mm,	Y =   122.018  mm,	Z =  -276.885  mm,
+	W =  -179.981 deg,	P =      .049 deg,	R =      .002 deg
+};
+P[5]{
+   GP1:
+	UF : 0, UT : 1,		CONFIG : 'N U T, 0, 0, 0',
+	X =   327.623  mm,	Y =  -132.368  mm,	Z =  -276.891  mm,
+	W =  -179.980 deg,	P =      .050 deg,	R =      .002 deg
+};
+P[6:""]{
+   GP1:
+	UF : 0, UT : 1,		CONFIG : 'N U T, 0, 0, 0',
+	X =   528.846  mm,	Y =  -132.379  mm,	Z =  -276.944  mm,
+	W =  -179.979 deg,	P =      .054 deg,	R =     -.000 deg
+};
+/END
+</script>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script>
+// ===== Core: math, kinematics, .ls parser, motion simulation (no DOM) =====
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+// Generic small 6-axis arm dimensions (mm). World origin sits on the J1 axis at J2 height.
+const ROBOT = { A1: 50, A2: 330, A3: 35, D4: 335, D6: 80, BASE: 330,
+  vmax: [450, 380, 520, 550, 545, 1000], maxLin: 2000 };
+const HOME = [0, 0, 0, 0, -90, 0];
+
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const scl = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const nrm = a => { const l = len(a) || 1; return scl(a, 1 / l); };
+const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const lerpN = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+const matMul = (A, B) => A.map((r, i) => [0, 1, 2].map(j => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+const matT = M => [[M[0][0], M[1][0], M[2][0]], [M[0][1], M[1][1], M[2][1]], [M[0][2], M[1][2], M[2][2]]];
+const col = (M, j) => [M[0][j], M[1][j], M[2][j]];
+const fromCols = (x, y, z) => [[x[0], y[0], z[0]], [x[1], y[1], z[1]], [x[2], y[2], z[2]]];
+const Rx = a => { const c = Math.cos(a), s = Math.sin(a); return [[1, 0, 0], [0, c, -s], [0, s, c]]; };
+const Ry = a => { const c = Math.cos(a), s = Math.sin(a); return [[c, 0, s], [0, 1, 0], [-s, 0, c]]; };
+const Rz = a => { const c = Math.cos(a), s = Math.sin(a); return [[c, -s, 0], [s, c, 0], [0, 0, 1]]; };
+
+// WPR: fixed-axis rotations about X (W), then Y (P), then Z (R)
+function wprToR(w, p, r) { return matMul(Rz(r * D2R), matMul(Ry(p * D2R), Rx(w * D2R))); }
+function rToWpr(R) {
+  const p = Math.atan2(-R[2][0], Math.hypot(R[0][0], R[1][0]));
+  return [Math.atan2(R[2][1], R[2][2]) * R2D, p * R2D, Math.atan2(R[1][0], R[0][0]) * R2D];
+}
+
+function quatFromR(m) {
+  const tr = m[0][0] + m[1][1] + m[2][2]; let q;
+  if (tr > 0) { const s = Math.sqrt(tr + 1) * 2; q = [0.25 * s, (m[2][1] - m[1][2]) / s, (m[0][2] - m[2][0]) / s, (m[1][0] - m[0][1]) / s]; }
+  else if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) { const s = Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]) * 2; q = [(m[2][1] - m[1][2]) / s, 0.25 * s, (m[0][1] + m[1][0]) / s, (m[0][2] + m[2][0]) / s]; }
+  else if (m[1][1] > m[2][2]) { const s = Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]) * 2; q = [(m[0][2] - m[2][0]) / s, (m[0][1] + m[1][0]) / s, 0.25 * s, (m[1][2] + m[2][1]) / s]; }
+  else { const s = Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]) * 2; q = [(m[1][0] - m[0][1]) / s, (m[0][2] + m[2][0]) / s, (m[1][2] + m[2][1]) / s, 0.25 * s]; }
+  const l = Math.hypot(...q); return q.map(v => v / l);
+}
+function quatToR(q) {
+  const [w, x, y, z] = q;
+  return [[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+          [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+          [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]];
+}
+function slerp(a, b, t) {
+  let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  if (d < 0) { b = b.map(v => -v); d = -d; }
+  if (d > 0.9995) { const r = a.map((v, i) => v + (b[i] - v) * t); const l = Math.hypot(...r); return r.map(v => v / l); }
+  const th = Math.acos(d), s = Math.sin(th), wa = Math.sin((1 - t) * th) / s, wb = Math.sin(t * th) / s;
+  return a.map((v, i) => v * wa + b[i] * wb);
+}
+const quatAngle = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3])));
+
+// Forward kinematics. q in degrees. J2 from vertical (+ forward); J3 forearm angle from horizontal (+ up).
+function fk(q, L) {
+  const [q1, q2, q3, q4, q5, q6] = q.map(d => d * D2R);
+  const c1 = Math.cos(q1), s1 = Math.sin(q1);
+  const er = [c1, s1, 0], et = [-s1, c1, 0], ez = [0, 0, 1];
+  const base = [0, 0, -ROBOT.BASE], j1 = [0, 0, 0], j2 = scl(er, ROBOT.A1);
+  const a1 = Math.PI / 2 - q2;
+  const E = add(j2, add(scl(er, ROBOT.A2 * Math.cos(a1)), scl(ez, ROBOT.A2 * Math.sin(a1))));
+  const u = add(scl(er, Math.cos(q3)), scl(ez, Math.sin(q3)));
+  const n = add(scl(er, -Math.sin(q3)), scl(ez, Math.cos(q3)));
+  const F3 = add(E, scl(n, ROBOT.A3)), W = add(F3, scl(u, ROBOT.D4));
+  const yw = scl(et, -1), xw = cross(yw, u);
+  const R = matMul(fromCols(xw, yw, u), matMul(Rz(q4), matMul(Ry(q5), Rz(q6))));
+  const z = col(R, 2);
+  const flange = add(W, scl(z, ROBOT.D6)), tip = add(flange, scl(z, L));
+  return { pts: [base, j1, j2, E, F3, W, flange, tip], R, tip };
+}
+
+const wrapNear = (a, ref) => { while (a - ref > 180) a -= 360; while (a - ref < -180) a += 360; return a; };
+
+// Inverse kinematics: front, elbow up; wrist solution nearest the reference joints.
+function ik(p, R, L, ref) {
+  ref = ref || HOME;
+  const z = col(R, 2);
+  const W = sub(p, scl(z, L + ROBOT.D6));
+  const q1 = Math.atan2(W[1], W[0]);
+  const r = Math.hypot(W[0], W[1]) - ROBOT.A1, zz = W[2];
+  const Le = Math.hypot(ROBOT.D4, ROBOT.A3), phi = Math.atan2(ROBOT.A3, ROBOT.D4);
+  let D = Math.hypot(r, zz), reach = true;
+  if (D > ROBOT.A2 + Le - 0.01) { reach = false; D = ROBOT.A2 + Le - 0.01; }
+  if (D < Math.abs(ROBOT.A2 - Le) + 0.01) { reach = false; D = Math.abs(ROBOT.A2 - Le) + 0.01; }
+  const ang = Math.atan2(zz, r);
+  const cA = Math.max(-1, Math.min(1, (ROBOT.A2 ** 2 + D * D - Le * Le) / (2 * ROBOT.A2 * D)));
+  const a1 = ang + Math.acos(cA);
+  const wr = D * Math.cos(ang), wz = D * Math.sin(ang);
+  const beta = Math.atan2(wz - ROBOT.A2 * Math.sin(a1), wr - ROBOT.A2 * Math.cos(a1));
+  const q2 = Math.PI / 2 - a1, q3 = beta - phi;
+  const c1 = Math.cos(q1), s1 = Math.sin(q1);
+  const er = [c1, s1, 0], et = [-s1, c1, 0];
+  const u = add(scl(er, Math.cos(q3)), [0, 0, Math.sin(q3)]);
+  const yw = scl(et, -1), xw = cross(yw, u);
+  const M = matMul(matT(fromCols(xw, yw, u)), R);
+  const s = Math.hypot(M[0][2], M[1][2]);
+  let sols;
+  if (s < 1e-6) {
+    const a = ref[3] * D2R;
+    sols = M[2][2] > 0 ? [[a, 0, Math.atan2(M[1][0], M[0][0]) - a]] : [[a, Math.PI, a + Math.atan2(M[0][1], -M[0][0])]];
+  } else {
+    sols = [[Math.atan2(M[1][2], M[0][2]), Math.atan2(s, M[2][2]), Math.atan2(M[2][1], -M[2][0])],
+            [Math.atan2(-M[1][2], -M[0][2]), Math.atan2(-s, M[2][2]), Math.atan2(-M[2][1], M[2][0])]];
+  }
+  let best = null, bc = Infinity;
+  for (const so of sols) {
+    const q4 = wrapNear(so[0] * R2D, ref[3]), q5 = so[1] * R2D, q6 = wrapNear(so[2] * R2D, ref[5]);
+    const c = Math.abs(q4 - ref[3]) + Math.abs(q5 - ref[4]) + Math.abs(q6 - ref[5]);
+    if (c < bc) { bc = c; best = [q4, q5, q6]; }
+  }
+  return { q: [wrapNear(q1 * R2D, ref[0]), q2 * R2D, q3 * R2D, ...best], reach };
+}
+
+function circle3(a, b, c) {
+  const ab = sub(b, a), ac = sub(c, a), n = cross(ab, ac), nn = dot(n, n);
+  if (nn < 1e-6) return null;
+  const center = add(a, scl(add(scl(cross(n, ab), dot(ac, ac)), scl(cross(ac, n), dot(ab, ab))), 1 / (2 * nn)));
+  const e1 = nrm(sub(a, center)), e2 = nrm(cross(nrm(n), e1)), r = len(sub(a, center));
+  let sweep = Math.atan2(dot(sub(c, center), e2), dot(sub(c, center), e1));
+  if (sweep <= 0) sweep += 2 * Math.PI;
+  return { center, e1, e2, r, sweep };
+}
+
+// ---------- .ls parser ----------
+function parseLS(text) {
+  const lines = text.replace(/\r/g, '').split('\n');
+  const prog = { name: 'PROGRAM', comment: '', mn: [], pos: {}, errors: [] };
+  const m0 = text.match(/\/PROG\s+(\S+)/); if (m0) prog.name = m0[1];
+  const mc = text.match(/COMMENT\s*=\s*"([^"]*)"/); if (mc) prog.comment = mc[1];
+  const iMN = lines.findIndex(l => /^\/MN\b/.test(l.trim()));
+  const iPOS = lines.findIndex(l => /^\/POS\b/.test(l.trim()));
+  if (iMN < 0) { prog.errors.push('No /MN section found. Is this an ASCII .ls program (not a binary .tp)?'); return prog; }
+  let stop = iPOS > iMN ? iPOS : lines.findIndex((l, i) => i > iMN && /^\/END/.test(l.trim()));
+  if (stop < 0) stop = lines.length;
+  let cur = null;
+  for (let i = iMN + 1; i < stop; i++) {
+    const l = lines[i]; let m;
+    if ((m = l.match(/^\s*(\d+):(.*)$/))) { cur = { num: +m[1], raw: m[2] }; prog.mn.push(cur); }
+    else if ((m = l.match(/^\s*:(.*)$/)) && cur) cur.raw += ' ' + m[1];
+  }
+  for (const ins of prog.mn) { ins.text = ins.raw.replace(/;\s*$/, '').replace(/\s+/g, ' ').trim(); parseIns(ins); }
+  const posText = iPOS >= 0 ? lines.slice(iPOS + 1).join('\n') : '';
+  const re = /P\[(\d+)(?::\s*"?([^"\]]*)"?)?\]\s*\{([\s\S]*?)\};/g; let pm;
+  while ((pm = re.exec(posText))) {
+    const body = pm[3];
+    const num = k => { const x = body.match(new RegExp('\\b' + k + '\\s*=\\s*([-+]?\\d*\\.?\\d+)')); return x ? parseFloat(x[1]) : null; };
+    const uf = (body.match(/UF\s*:\s*(\d+)/) || [])[1], ut = (body.match(/UT\s*:\s*(\d+)/) || [])[1];
+    const P = { n: +pm[1], cmt: pm[2] || '', uf: uf != null ? +uf : 0, ut: ut != null ? +ut : 1,
+      config: (body.match(/CONFIG\s*:\s*'([^']*)'/) || [])[1] || '' };
+    if (num('X') !== null) P.cart = ['X', 'Y', 'Z', 'W', 'P', 'R'].map(k => num(k) ?? 0);
+    else if (num('J1') !== null) P.joints = ['J1', 'J2', 'J3', 'J4', 'J5', 'J6'].map(k => num(k) ?? 0);
+    prog.pos[P.n] = P;
+  }
+  return prog;
+}
+function parseIns(ins) {
+  const t = ins.text; let m;
+  ins.type = 'other';
+  if (!t) { ins.type = 'empty'; return; }
+  if ((m = t.match(/^UFRAME_NUM\s*=\s*(\d+)/))) { ins.type = 'uframe'; ins.val = +m[1]; return; }
+  if ((m = t.match(/^UTOOL_NUM\s*=\s*(\d+)/))) { ins.type = 'utool'; ins.val = +m[1]; return; }
+  const PREF = '(P|PR)\\[(\\d+)(?::([^\\]]*))?\\]';
+  if ((m = t.match(new RegExp('^C\\s+' + PREF + '\\s+' + PREF + '\\s*(.*)$')))) {
+    ins.type = 'motion'; ins.mt = 'C';
+    ins.via = { reg: m[1], n: +m[2], cmt: m[3] || '' }; ins.tgt = { reg: m[4], n: +m[5], cmt: m[6] || '' };
+    parseTail(ins, m[7]); return;
+  }
+  if ((m = t.match(new RegExp('^([JL])\\s+' + PREF + '\\s*(.*)$')))) {
+    ins.type = 'motion'; ins.mt = m[1]; ins.tgt = { reg: m[2], n: +m[3], cmt: m[4] || '' };
+    parseTail(ins, m[5]); return;
+  }
+  if (/^[JLCA]\s/.test(t)) ins.type = 'unsupported';
+}
+function parseTail(ins, s) {
+  let m; ins.speed = { kind: 'pct', val: 100, txt: '' };
+  if ((m = s.match(/^([\d.]+)\s*%/))) ins.speed = { kind: 'pct', val: +m[1] };
+  else if ((m = s.match(/^([\d.]+)\s*mm\/sec/i))) ins.speed = { kind: 'lin', val: +m[1] };
+  else if ((m = s.match(/^([\d.]+)\s*cm\/min/i))) ins.speed = { kind: 'lin', val: +m[1] * 10 / 60 };
+  else if ((m = s.match(/^([\d.]+)\s*inch\/min/i))) ins.speed = { kind: 'lin', val: +m[1] * 25.4 / 60 };
+  else if ((m = s.match(/^([\d.]+)\s*deg\/sec/i))) ins.speed = { kind: 'deg', val: +m[1] };
+  else if ((m = s.match(/^([\d.]+)\s*sec/i))) ins.speed = { kind: 'time', val: +m[1] };
+  else if (/^max_speed/i.test(s)) ins.speed = { kind: 'max', val: ROBOT.maxLin };
+  if ((m = s.match(/\bCNT\s*(\d+)/i))) ins.term = { kind: 'CNT', val: Math.min(100, +m[1]) };
+  else ins.term = { kind: 'FINE', val: 0 };
+  ins.extras = s.replace(/^\S+/, '').replace(/\b(FINE|CNT\s*\d+|CR\s*\d*)\b/i, '').trim();
+}
+
+// ---------- simulation ----------
+function poseOf(prog, ref, st) {
+  if (!ref) return null;
+  if (ref.reg === 'PR') {
+    const q = (st.pr[ref.n] || HOME).slice(), f = fk(q, st.tool);
+    return { p: f.tip, R: f.R, q, label: `PR[${ref.n}]`, isPR: true };
+  }
+  const P = prog.pos[ref.n]; if (!P) return null;
+  const label = `P[${ref.n}]`;
+  if (P.cart) { const [x, y, z, w, p, r] = P.cart; return { p: [x, y, z], R: wprToR(w, p, r), q: null, label, P }; }
+  if (P.joints) { const f = fk(P.joints, st.tool); return { p: f.tip, R: f.R, q: P.joints.slice(), label, P }; }
+  return null;
+}
+function pathLen(sm) { let s = 0; for (let i = 1; i < sm.length; i++) s += len(sub(sm[i].p, sm[i - 1].p)); return s; }
+function interpSample(a, b, f) {
+  return { p: lerp3(a.p, b.p, f), quat: slerp(a.quat, b.quat, f), q: a.q && b.q ? lerpN(a.q, b.q, f) : null, tau: a.tau + (b.tau - a.tau) * f };
+}
+function trimStart(sm, r) {
+  let acc = 0;
+  for (let k = 1; k < sm.length; k++) {
+    const d = len(sub(sm[k].p, sm[k - 1].p));
+    if (acc + d >= r) { const f = d > 0 ? (r - acc) / d : 0; return [interpSample(sm[k - 1], sm[k], f), ...sm.slice(k)]; }
+    acc += d;
+  }
+  return [sm[sm.length - 1]];
+}
+function trimEnd(sm, r) { return trimStart(sm.slice().reverse(), r).reverse(); }
+function distToSeg(p, a, b) {
+  const ab = sub(b, a), l2 = dot(ab, ab); if (l2 < 1e-9) return len(sub(p, a));
+  const t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / l2)); return len(sub(p, add(a, scl(ab, t))));
+}
+
+function buildSim(prog, st) {
+  const L = st.tool, issues = [], segs = [];
+  const motions = prog.mn.filter(i => i.type === 'motion');
+  const zs = [];
+  for (const i of motions) for (const r of [i.tgt, i.via]) if (r && r.reg === 'P') { const ps = poseOf(prog, r, st); if (ps) zs.push(ps.p[2]); }
+  const surfZ = zs.length ? Math.min(...zs) : -1e9;
+  const onSurf = p => p[2] <= surfZ + st.tol;
+  const firstPR = motions.find(i => i.tgt.reg === 'PR');
+  const q0 = firstPR ? (st.pr[firstPR.tgt.n] || HOME).slice() : HOME.slice();
+  const f0 = fk(q0, L);
+  const start = { p: f0.tip, R: f0.R, q: q0, label: firstPR ? `PR[${firstPR.tgt.n}]` : 'start' };
+  let cur = start;
+  const flagged = new Set();
+  const once = (key, iss) => { if (!flagged.has(key)) { flagged.add(key); issues.push(iss); } };
+
+  for (const ins of prog.mn) {
+    if (ins.type === 'uframe') {
+      if (ins.val !== 0) issues.push({ line: ins.num, sev: 'warn', title: `User frame ${ins.val} selected`, detail: 'This viewer draws every point in the World frame (UFRAME 0), so points taught in another user frame will appear in the wrong place.' });
+      continue;
+    }
+    if (ins.type === 'unsupported') { issues.push({ line: ins.num, sev: 'info', title: 'Motion not simulated', detail: `"${ins.text}" uses a motion form this viewer doesn't handle yet.` }); continue; }
+    if (ins.type !== 'motion') continue;
+    const tgt = poseOf(prog, ins.tgt, st);
+    if (!tgt) { issues.push({ line: ins.num, sev: 'bad', title: `P[${ins.tgt.n}] has no position data`, detail: 'The point is used in the program but missing from the /POS section, so this move is skipped.' }); continue; }
+    if (tgt.P && tgt.P.uf !== 0) once('uf' + tgt.P.n, { line: ins.num, sev: 'warn', title: `${tgt.label} was taught in user frame ${tgt.P.uf}`, detail: 'It is drawn as if it were in World, so its location here is not reliable.' });
+    if (ins.extras) issues.push({ line: ins.num, sev: 'info', title: 'Option not simulated', detail: `"${ins.extras}" is ignored here; the move is shown without it.` });
+    const seg = { line: ins.num, ins, mt: ins.mt, from: cur, to: tgt, term: ins.term, samples: [] };
+    if (ins.mt === 'J') {
+      const qa = cur.q; let qb = tgt.q, reach = true;
+      if (!qb) { const s = ik(tgt.p, tgt.R, L, qa); qb = s.q; reach = s.reach; }
+      const dq = qb.map((v, k) => Math.abs(v - qa[k]));
+      let dur;
+      if (ins.speed.kind === 'pct') dur = Math.max(...dq.map((d, k) => d / (ROBOT.vmax[k] * Math.max(ins.speed.val, 1) / 100)));
+      else if (ins.speed.kind === 'time') dur = ins.speed.val;
+      else dur = len(sub(tgt.p, cur.p)) / (ins.speed.val || 250);
+      dur = Math.max(dur, 0.08) + 0.15; // rough allowance for acceleration
+      const N = Math.min(400, Math.max(16, Math.ceil(Math.max(...dq) / 0.5)));
+      for (let k = 0; k <= N; k++) {
+        const s = k / N, q = lerpN(qa, qb, s), f = fk(q, L);
+        seg.samples.push({ p: f.tip, quat: quatFromR(f.R), q, tau: s * dur });
+      }
+      seg.dur = dur; seg.reach = reach;
+      tgt.q = qb; tgt.p = seg.samples[N].p;
+    } else {
+      const qa = quatFromR(cur.R), qb = quatFromR(tgt.R);
+      let pts = null, plen = len(sub(tgt.p, cur.p));
+      if (ins.mt === 'C') {
+        const via = poseOf(prog, ins.via, st);
+        const c = via && circle3(cur.p, via.p, tgt.p);
+        seg.via = via;
+        if (!via) issues.push({ line: ins.num, sev: 'bad', title: `Via point P[${ins.via.n}] missing`, detail: 'Drawn as a straight line instead.' });
+        else if (!c) issues.push({ line: ins.num, sev: 'warn', title: 'Circle points are in a line', detail: 'The start, via and end points don’t define an arc, so this is drawn straight.' });
+        if (c) {
+          plen = c.r * c.sweep; seg.circle = c;
+          const N = Math.max(12, Math.ceil(plen / 2)); pts = [];
+          for (let k = 0; k <= N; k++) { const a = c.sweep * k / N; pts.push({ p: add(c.center, add(scl(c.e1, c.r * Math.cos(a)), scl(c.e2, c.r * Math.sin(a)))), s: k / N }); }
+        }
+      }
+      if (!pts) { const N = Math.max(2, Math.ceil(plen / 2)); pts = []; for (let k = 0; k <= N; k++) pts.push({ p: lerp3(cur.p, tgt.p, k / N), s: k / N }); }
+      const angle = quatAngle(qa, qb) * R2D;
+      const sp = ins.speed;
+      const v = sp.kind === 'lin' || sp.kind === 'max' ? sp.val : sp.kind === 'pct' ? ROBOT.maxLin * sp.val / 100 : 250;
+      let dur = sp.kind === 'time' ? sp.val : sp.kind === 'deg' ? Math.max(angle / sp.val, plen / ROBOT.maxLin) : Math.max(plen / v, angle / 180) + v / 4000; // + accel/decel allowance
+      dur = Math.max(dur, 0.05);
+      seg.samples = pts.map(o => ({ p: o.p, quat: slerp(qa, qb, o.s), q: null, tau: o.s * dur }));
+      seg.dur = dur;
+      const s = ik(tgt.p, tgt.R, L, cur.q); seg.reach = s.reach; tgt.q = s.q;
+    }
+    seg.len = pathLen(seg.samples); seg.v = seg.len / seg.dur;
+    seg.full = seg.samples;
+    segs.push(seg);
+    cur = tgt;
+  }
+
+  // CNT corner rounding (approximation: blend distance grows with CNT value and speed)
+  for (let i = 0; i < segs.length - 1; i++) {
+    const a = segs[i], b = segs[i + 1];
+    if (a.term.kind !== 'CNT' || a.term.val <= 0) continue;
+    const r = (a.term.val / 100) * Math.min(a.len * 0.5, b.len * 0.5, Math.max(2, 0.4 * a.v));
+    if (r < 0.3) continue;
+    a.blendR = r; a.trimE = r; b.trimS = r;
+  }
+  for (const s of segs) {
+    if (s.trimS) s.samples = trimStart(s.samples, s.trimS);
+    if (s.trimE) s.samples = trimEnd(s.samples, s.trimE);
+  }
+  for (let i = 0; i < segs.length - 1; i++) {
+    const a = segs[i], b = segs[i + 1]; if (!a.blendR) continue;
+    const A = a.samples[a.samples.length - 1], B = b.samples[0], C = a.full[a.full.length - 1];
+    const M = Math.max(8, Math.ceil((len(sub(C.p, A.p)) + len(sub(B.p, C.p))) / 2));
+    const out = [];
+    for (let k = 0; k <= M; k++) {
+      const t = k / M;
+      if (A.q && B.q && C.q) {
+        // joint-space blend between two joint moves
+        const q = A.q.map((v, j) => (1 - t) * (1 - t) * v + 2 * t * (1 - t) * C.q[j] + t * t * B.q[j]);
+        const f = fk(q, L); out.push({ p: f.tip, quat: quatFromR(f.R), q });
+      } else {
+        const p = add(add(scl(A.p, (1 - t) * (1 - t)), scl(C.p, 2 * t * (1 - t))), scl(B.p, t * t));
+        out.push({ p, quat: slerp(A.quat, B.quat, t), q: null });
+      }
+    }
+    const vb = Math.max(1, (a.v + b.v) / 2); let tau = 0; out[0].tau = 0;
+    for (let k = 1; k < out.length; k++) { tau += len(sub(out[k].p, out[k - 1].p)) / vb; out[k].tau = tau; }
+    b.blend = out;
+  }
+
+  // flatten into a timeline
+  const T = { p: [], quat: [], q: [], t: [], line: [], kind: [], seg: [] };
+  let t = 0;
+  const push = (s, line, kind, si) => { T.p.push(s.p); T.quat.push(s.quat); T.q.push(s.q); T.t.push(t); T.line.push(line); T.kind.push(kind); T.seg.push(si); };
+  push({ p: start.p, quat: quatFromR(start.R), q: start.q }, segs.length ? segs[0].line : 0, 'S', 0);
+  segs.forEach((s, si) => {
+    s.tStart = t; s.iStart = T.t.length - 1;
+    if (s.blend) for (let k = 1; k < s.blend.length; k++) { t += Math.max(0, s.blend[k].tau - s.blend[k - 1].tau); push(s.blend[k], s.line, 'B', si); }
+    const sm = s.samples;
+    for (let k = 1; k < sm.length; k++) { t += Math.max(0, sm[k].tau - sm[k - 1].tau); push(sm[k], s.line, s.mt, si); }
+    if (!s.blendR) { t += s.term.kind === 'FINE' ? 0.12 : 0.02; push(sm[sm.length - 1], s.line, s.mt, si); }
+    s.tEnd = t;
+  });
+  let prevQ = T.q[0] || HOME; T.reach = [];
+  for (let i = 0; i < T.p.length; i++) {
+    if (!T.q[i]) { const s = ik(T.p[i], quatToR(T.quat[i]), L, prevQ); T.q[i] = s.q; T.reach[i] = s.reach; }
+    else T.reach[i] = true;
+    prevQ = T.q[i];
+  }
+  T.ink = T.p.map(p => onSurf(p));
+  T.crash = T.p.map(p => p[2] < surfZ - st.comp);
+
+  // ---- findings ----
+  segs.forEach((s, si) => {
+    const a = s.from.p, b = s.to.p, aOn = onSurf(a), bOn = onSurf(b);
+    const horiz = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const word = { J: 'J', L: 'L', C: 'C' }[s.mt];
+    if (!s.reach) issues.push({ line: s.line, sev: 'bad', title: `${s.to.label} is out of reach`, detail: `This arm model can’t reach ${s.to.label} with a ${L} mm tool. Check the tool length in Settings.` });
+    if (s.mt === 'J' && aOn && bOn) {
+      let dev = 0, lo = 0, hi = 0;
+      for (const sm of s.full) { dev = Math.max(dev, distToSeg(sm.p, a, b)); lo = Math.min(lo, sm.p[2] - surfZ); hi = Math.max(hi, sm.p[2] - surfZ); }
+      let extra = '';
+      if (hi > 0.5) extra += ` It lifts up to ${hi.toFixed(1)} mm off the surface.`;
+      if (lo < -0.5) extra += ` It pushes ${(-lo).toFixed(1)} mm into the surface.`;
+      issues.push({ line: s.line, sev: 'warn', title: `Joint move used to draw a side`, detail: `J ${s.to.label} moves each axis independently, so the tip strays up to ${dev.toFixed(1)} mm from the straight line between ${s.from.label} and ${s.to.label}.${extra} Use L for anything drawn on the part.` });
+    }
+    if (!aOn && bOn && horiz > 10) issues.push({ line: s.line, sev: 'warn', title: `No approach point above ${s.to.label}`, detail: `${word} ${s.to.label} comes in from ${s.from.label} at an angle: ${horiz.toFixed(0)} mm sideways while dropping ${(a[2] - b[2]).toFixed(0)} mm. Teach a point directly above ${s.to.label} and come straight down with L … FINE.` + (s.blendR ? ` The CNT${s.term.val} also makes the tip touch down before it reaches ${s.to.label}.` : '') });
+    if (aOn && !bOn && horiz > 10) issues.push({ line: s.line, sev: 'warn', title: `Leaves the surface at an angle`, detail: `The move to ${s.to.label} drags off ${s.from.label} sideways. Lift straight up with an L move first.` });
+    const nx = segs[si + 1];
+    if (s.blendR && bOn && aOn && nx && onSurf(nx.to.p)) issues.push({ line: s.line, sev: 'info', title: `CNT${s.term.val} rounds the corner at ${s.to.label}`, detail: `The tip starts turning about ${s.blendR.toFixed(1)} mm before ${s.to.label} and never touches the corner itself. Use FINE if the corner must be sharp.` });
+  });
+  const crashBy = {};
+  T.crash.forEach((c, i) => { if (c) { const l = T.line[i], d = surfZ - T.p[i][2]; crashBy[l] = Math.max(crashBy[l] || 0, d); } });
+  for (const l in crashBy) issues.push({ line: +l, sev: 'bad', title: 'Tip goes below the surface', detail: `On this line the tip reaches ${crashBy[l].toFixed(1)} mm below the drawing surface. A pen in a spring holder may survive that; a rigid tool would crash.` });
+  const reachBy = {};
+  T.reach.forEach((r, i) => { if (!r) reachBy[T.line[i]] = true; });
+  for (const l in reachBy) if (!issues.some(x => x.line === +l && /out of reach/.test(x.title))) issues.push({ line: +l, sev: 'bad', title: 'Path passes out of reach', detail: 'Part of this move is outside the arm model’s reach.' });
+  let run = [];
+  const flush = () => {
+    if (run.length >= 2) {
+      const first = run[0].from, last = run[run.length - 1].to, gap = len(sub(last.p, first.p)), nv = run.length + 1;
+      const lineN = run[run.length - 1].line;
+      if (gap > 0.05 && gap < 8) issues.push({ line: lineN, sev: 'warn', title: `Shape doesn’t close exactly`, detail: `It ends on ${last.label}, ${gap.toFixed(1)} mm from where it started at ${first.label}. Reuse ${first.label} as the last point instead of teaching a new one near it.` });
+      else if (gap >= 8 && nv >= 4) issues.push({ line: lineN, sev: 'info', title: `Open path from ${first.label} to ${last.label}`, detail: `This stretch on the surface ends ${gap.toFixed(0)} mm from where it started. If it’s meant to be a closed shape, add a move back to ${first.label}.` });
+    }
+    run = [];
+  };
+  for (const s of segs) { if (onSurf(s.from.p) && onSurf(s.to.p)) run.push(s); else flush(); }
+  flush();
+  const sevRank = { bad: 0, warn: 1, info: 2 };
+  issues.sort((x, y) => x.line - y.line || sevRank[x.sev] - sevRank[y.sev]);
+
+  let ink = 0;
+  for (let i = 1; i < T.p.length; i++) if (T.ink[i] && T.ink[i - 1]) ink += len(sub(T.p[i], T.p[i - 1]));
+  return { segs, T, issues, surfZ, total: t, start, inkLen: ink, prog };
+}
+
+if (typeof module !== 'undefined') module.exports = { parseLS, buildSim, fk, ik, wprToR, rToWpr, HOME };
+
+</script>
+<script>
+// ===== App: UI, 3D cell, paper view =====
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (v, d = 1) => (Math.abs(v) < 0.05 && d <= 1 ? 0 : v).toFixed(d);
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ppv.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ppv.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+const settings = { tool: store.get('tool', 100), tol: 1, comp: store.get('comp', 3), pr: store.get('pr', {}) };
+const programs = [];
+let active = -1, sim = null, t = 0, playing = false, speed = 1, lastIdx = -1, paperDirty = true;
+
+// ---------- programs ----------
+function addProgram(text, select) {
+  const prog = parseLS(text);
+  const existing = programs.findIndex(p => p.name === prog.name);
+  if (existing >= 0) programs[existing] = prog; else programs.push(prog);
+  renderTabs();
+  if (select) selectProgram(existing >= 0 ? existing : programs.length - 1);
+}
+function renderTabs() {
+  $('tabs').innerHTML = programs.map((p, i) => `<button class="tab" type="button" data-i="${i}" aria-pressed="${i === active}">${esc(p.name)}</button>`).join('');
+}
+$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) selectProgram(+b.dataset.i); });
+$('fileIn').addEventListener('change', async e => {
+  const files = [...e.target.files];
+  for (let i = 0; i < files.length; i++) addProgram(await files[i].text(), i === files.length - 1);
+  e.target.value = '';
+});
+$('pasteBtn').addEventListener('click', () => { const v = $('paste').value.trim(); if (v) { addProgram(v, true); $('paste').value = ''; } });
+
+function selectProgram(i) {
+  active = i; renderTabs();
+  const prog = programs[i];
+  $('progMeta').textContent = `${prog.name}${prog.comment ? ' · "' + prog.comment + '"' : ''}`;
+  renderPRFields(prog);
+  rebuild(0);
+}
+
+function renderPRFields(prog) {
+  const used = {};
+  prog.mn.forEach(ins => { if (ins.type === 'motion') for (const r of [ins.tgt, ins.via]) if (r && r.reg === 'PR') used[r.n] = r.cmt; });
+  const keys = Object.keys(used);
+  if (!keys.length) { $('prFields').innerHTML = ''; return; }
+  $('prFields').innerHTML = `<span class="fl">Position registers (joint values)</span>
+    <p class="hint">PR values live on the controller, not in the .ls file. Copy them from DATA › Position Reg so home matches your cell. Default is J5 −90°, everything else 0°.</p>` +
+    keys.map(n => {
+      const q = settings.pr[n] || HOME;
+      return `<div class="field"><span class="fl" style="color:var(--fg)">PR[${n}${used[n] ? ':' + esc(used[n]) : ''}]</span>
+        <div class="prgrid">${q.map((v, j) => `<span>J${j + 1}</span>`).join('')}${q.map((v, j) => `<input class="num" type="number" step="0.1" id="pr${n}_${j}" data-pr="${n}" data-j="${j}" value="${+v.toFixed(2)}" aria-label="PR ${n} J${j + 1}">`).join('')}</div></div>`;
+    }).join('');
+}
+$('prFields').addEventListener('change', e => {
+  const inp = e.target.closest('input[data-pr]'); if (!inp) return;
+  const n = inp.dataset.pr, q = (settings.pr[n] || HOME).slice();
+  q[+inp.dataset.j] = parseFloat(inp.value) || 0;
+  settings.pr[n] = q; store.set('pr', settings.pr); rebuild(t / (sim ? sim.total : 1));
+});
+function bindPair(rangeId, numId, key) {
+  const r = $(rangeId), n = $(numId);
+  r.value = n.value = settings[key];
+  const apply = v => { settings[key] = v; r.value = n.value = v; store.set(key, v); rebuild(sim ? t / sim.total : 0); };
+  r.addEventListener('input', () => apply(parseFloat(r.value)));
+  n.addEventListener('change', () => apply(Math.max(0, parseFloat(n.value) || 0)));
+}
+bindPair('toolLen', 'toolLenN', 'tool');
+bindPair('comp', 'compN', 'comp');
+
+// ---------- build ----------
+function rebuild(frac) {
+  if (active < 0) return;
+  const prog = programs[active];
+  try { sim = buildSim(prog, settings); }
+  catch (err) { sim = null; $('issues').innerHTML = `<li class="err">Couldn't simulate this program: ${esc(err.message)}</li>`; return; }
+  sim.ptLabels = collectPoints(prog);
+  sim.bounds = paperBounds();
+  t = Math.min(sim.total, Math.max(0, (frac || 0) * sim.total));
+  renderListing(); renderIssues(); buildScene(); lastIdx = -1; paperDirty = true;
+}
+function collectPoints(prog) {
+  const out = [], seen = new Set();
+  prog.mn.forEach(ins => {
+    if (ins.type !== 'motion') return;
+    for (const r of [ins.via, ins.tgt]) if (r && r.reg === 'P' && !seen.has(r.n)) {
+      seen.add(r.n); const ps = poseOf(prog, r, settings); if (ps) out.push({ label: `P[${r.n}]`, p: ps.p });
+    }
+  });
+  return out;
+}
+
+// ---------- listing & findings ----------
+function renderListing() {
+  const byLine = {};
+  sim.issues.forEach(i => { const r = { bad: 0, warn: 1, info: 2 }[i.sev]; if (!(i.line in byLine) || r < byLine[i.line]) byLine[i.line] = r; });
+  const sevName = ['bad', 'warn', 'info'];
+  const prog = programs[active];
+  if (prog.errors.length) { $('listing').innerHTML = `<li class="err">${esc(prog.errors[0])}</li>`; return; }
+  $('listing').innerHTML = prog.mn.map(ins => {
+    const isMove = ins.type === 'motion';
+    let code = esc(ins.text || '');
+    if (isMove) code = code.replace(/^([JLC])\b/, `<span class="m$1">$1</span>`);
+    const dot = ins.num in byLine ? `<span class="dot ${sevName[byLine[ins.num]]}" title="See findings"></span>` : '<span></span>';
+    return `<li data-line="${ins.num}" class="${isMove ? '' : 'nomove'}" ${isMove ? 'tabindex="0"' : ''}><span class="ln">${ins.num}:</span><code>${code || '&nbsp;'}</code>${dot}</li>`;
+  }).join('');
+}
+function jumpToLine(n) {
+  const s = sim.segs.find(g => g.line >= n); if (!s) return;
+  t = s.tStart + 1e-6; playing = false; updatePlay(); lastIdx = -1; paperDirty = true;
+}
+$('listing').addEventListener('click', e => { const li = e.target.closest('li[data-line]'); if (li && !li.classList.contains('nomove')) jumpToLine(+li.dataset.line); });
+$('listing').addEventListener('keydown', e => { if (e.key === 'Enter') { const li = e.target.closest('li[data-line]'); if (li) jumpToLine(+li.dataset.line); } });
+
+function renderIssues() {
+  const c = { bad: 0, warn: 0, info: 0 }; sim.issues.forEach(i => c[i.sev]++);
+  $('issueCount').textContent = sim.issues.length ? `${c.bad} problems · ${c.warn} warnings · ${c.info} notes` : 'none';
+  const moves = sim.segs.length;
+  $('summary').innerHTML = `<span class="chip">cycle ≈ <b>${sim.total.toFixed(1)} s</b></span><span class="chip">moves <b>${moves}</b></span><span class="chip">ink <b>${sim.inkLen.toFixed(0)} mm</b></span><span class="chip">surface Z <b>${sim.surfZ > -1e8 ? sim.surfZ.toFixed(2) : '—'} mm</b></span>`;
+  $('issues').innerHTML = sim.issues.length ? sim.issues.map(i => `<li data-line="${i.line}" tabindex="0"><span class="stripe ${i.sev}"></span><span class="lno">L${i.line}</span><div><div class="t">${esc(i.title)}</div><div class="d">${esc(i.detail)}</div></div></li>`).join('')
+    : '<li class="empty" style="display:block;cursor:default">No problems found. Every drawn side is a linear move, shapes close on their first point, and the tool comes straight down and up.</li>';
+}
+$('issues').addEventListener('click', e => { const li = e.target.closest('li[data-line]'); if (li) jumpToLine(+li.dataset.line); });
+$('issues').addEventListener('keydown', e => { if (e.key === 'Enter') { const li = e.target.closest('li[data-line]'); if (li) jumpToLine(+li.dataset.line); } });
+
+// ---------- transport ----------
+function updatePlay() { $('playBtn').textContent = playing ? '❚❚ Pause' : '▶ Play'; }
+$('playBtn').addEventListener('click', () => { if (!sim) return; if (t >= sim.total - 1e-6) t = 0; playing = !playing; updatePlay(); });
+$('restartBtn').addEventListener('click', () => { t = 0; lastIdx = -1; paperDirty = true; });
+$('stepBtn').addEventListener('click', () => {
+  if (!sim) return; const s = sim.segs.find(g => g.tStart > t + 1e-3);
+  t = s ? s.tStart + 1e-6 : sim.total; playing = false; updatePlay(); paperDirty = true;
+});
+$('scrub').addEventListener('input', () => { if (!sim) return; t = sim.total * $('scrub').value / 1000; paperDirty = true; });
+$('speeds').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return; speed = +b.dataset.s;
+  [...$('speeds').children].forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+['showAir', 'showGhost'].forEach(id => $(id).addEventListener('change', () => paperDirty = true));
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !/INPUT|TEXTAREA|BUTTON|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); $('playBtn').click(); }
+});
+
+function sampleAt(tt) {
+  const T = sim.T; let lo = 0, hi = T.t.length - 1;
+  if (tt <= T.t[0]) return { i: 0, f: 0 };
+  if (tt >= T.t[hi]) return { i: hi, f: 0 };
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T.t[m] <= tt) lo = m; else hi = m; }
+  const d = T.t[hi] - T.t[lo]; return { i: lo, f: d > 0 ? (tt - T.t[lo]) / d : 0 };
+}
+
+// ---------- 3D ----------
+let renderer = null, scene, camera, controls, robotParts = null, pathGroup = null, inkObj = null, tipMarker = null;
+const view = $('view3d');
+function init3D() {
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    view.prepend(renderer.domElement);
+  } catch (e) { renderer = null; view.insertAdjacentHTML('beforeend', '<div class="err" style="position:absolute;inset:auto 0 50% 0;text-align:center">3D view needs WebGL, which this browser blocked. The paper view still works.</div>'); return; }
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(38, 1, 5, 20000);
+  camera.up.set(0, 0, 1);
+  camera.position.set(1250, -1050, 620);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.12;
+  controls.target.set(380, 0, -180);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.85));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.75); dl.position.set(600, -900, 1400); scene.add(dl);
+  new ResizeObserver(resize3D).observe(view); resize3D();
+}
+function resize3D() {
+  if (!renderer) return;
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+const UP = new THREE.Vector3(0, 1, 0);
+function placeLink(mesh, a, b, r) {
+  const va = new THREE.Vector3(...a), d = new THREE.Vector3(...b).sub(va), L = d.length();
+  mesh.position.copy(va).addScaledVector(d, 0.5);
+  mesh.scale.set(r, Math.max(L, 0.01), r);
+  if (L > 1e-6) mesh.quaternion.setFromUnitVectors(UP, d.normalize());
+}
+function labelSprite(text, color) {
+  const c = document.createElement('canvas'), ctx = c.getContext('2d'), fs = 40;
+  ctx.font = `600 ${fs}px "IBM Plex Mono", monospace`;
+  c.width = Math.ceil(ctx.measureText(text).width) + 16; c.height = fs + 12;
+  ctx.font = `600 ${fs}px "IBM Plex Mono", monospace`; ctx.fillStyle = color; ctx.textBaseline = 'middle'; ctx.fillText(text, 8, c.height / 2);
+  const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  s.scale.set(15 * c.width / c.height, 15, 1); s.renderOrder = 5; return s;
+}
+function buildScene() {
+  if (!renderer) return;
+  if (pathGroup) { scene.remove(pathGroup); pathGroup.traverse(o => { o.geometry && o.geometry.dispose(); o.material && (o.material.map && o.material.map.dispose(), o.material.dispose()); }); }
+  if (robotParts) { robotParts.group.traverse(o => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }); scene.remove(robotParts.group); }
+  scene.background = new THREE.Color(css('--scene'));
+  pathGroup = new THREE.Group(); scene.add(pathGroup);
+  const T = sim.T, surfZ = sim.surfZ > -1e8 ? sim.surfZ : -280;
+  // floor grid at robot base height
+  const grid = new THREE.GridHelper(1600, 32, new THREE.Color(css('--grid2')), new THREE.Color(css('--grid')));
+  grid.rotation.x = Math.PI / 2; grid.position.set(300, 0, -ROBOT.BASE); pathGroup.add(grid);
+  // paper sheet
+  const b = sim.bounds;
+  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(b.maxX - b.minX, b.maxY - b.minY),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(css('--paper')), roughness: 1, side: THREE.DoubleSide }));
+  sheet.position.set((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, surfZ - 0.6); pathGroup.add(sheet);
+  // table under sheet
+  const table = new THREE.Mesh(new THREE.BoxGeometry(b.maxX - b.minX + 120, b.maxY - b.minY + 160, 18),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(css('--grid2')), roughness: 0.9 }));
+  table.position.set((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, surfZ - 10); pathGroup.add(table);
+  // planned path, colored by motion type
+  const kc = { J: css('--mJ'), L: css('--mL'), C: css('--mC'), B: css('--mB'), S: css('--mB') };
+  const pos = [], cols = [], cc = {};
+  for (const k in kc) cc[k] = new THREE.Color(kc[k]);
+  for (let i = 1; i < T.p.length; i++) {
+    const c = cc[T.kind[i]] || cc.B;
+    pos.push(...T.p[i - 1], ...T.p[i]); cols.push(c.r, c.g, c.b, c.r, c.g, c.b);
+  }
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  pg.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  pathGroup.add(new THREE.LineSegments(pg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })));
+  // ink, revealed over time
+  const ip = [], ic = [], iend = [], inkC = new THREE.Color(css('--ink')), badC = new THREE.Color(css('--bad'));
+  for (let i = 1; i < T.p.length; i++) if (T.ink[i] && T.ink[i - 1]) {
+    const c = T.crash[i] ? badC : inkC;
+    ip.push(T.p[i - 1][0], T.p[i - 1][1], surfZ + 0.4, T.p[i][0], T.p[i][1], surfZ + 0.4); ic.push(c.r, c.g, c.b, c.r, c.g, c.b); iend.push(i);
+  }
+  const ig = new THREE.BufferGeometry();
+  ig.setAttribute('position', new THREE.Float32BufferAttribute(ip, 3));
+  ig.setAttribute('color', new THREE.Float32BufferAttribute(ic, 3));
+  inkObj = new THREE.LineSegments(ig, new THREE.LineBasicMaterial({ vertexColors: true }));
+  inkObj.userData.ends = iend; pathGroup.add(inkObj);
+  // taught points
+  const fg = css('--fg');
+  const dotG = new THREE.SphereGeometry(3.2, 12, 8), dotM = new THREE.MeshBasicMaterial({ color: new THREE.Color(fg) });
+  sim.ptLabels.forEach((pt, k) => {
+    const m = new THREE.Mesh(dotG, dotM); m.position.set(...pt.p); pathGroup.add(m);
+    const s = labelSprite(pt.label, fg); s.position.set(pt.p[0], pt.p[1], pt.p[2] + 14 + (k % 2) * 10); pathGroup.add(s);
+  });
+  // robot
+  const group = new THREE.Group(), body = new THREE.MeshStandardMaterial({ color: new THREE.Color(css('--robot')), roughness: 0.55, metalness: 0.1 });
+  const dark = new THREE.MeshStandardMaterial({ color: new THREE.Color(css('--robot-2')), roughness: 0.6 });
+  const toolM = new THREE.MeshStandardMaterial({ color: new THREE.Color(css('--ink')), roughness: 0.4 });
+  const cyl = new THREE.CylinderGeometry(1, 1, 1, 24), sph = new THREE.SphereGeometry(1, 20, 14);
+  const links = [[dark, 62], [dark, 46], [body, 44], [body, 30], [body, 34], [dark, 28], [toolM, 7]].map(([m, r]) => { const x = new THREE.Mesh(cyl, m); x.userData.r = r; group.add(x); return x; });
+  const joints = [[dark, 50], [dark, 40], [dark, 34]].map(([m, r]) => { const x = new THREE.Mesh(sph, m); x.scale.setScalar(r); group.add(x); return x; });
+  tipMarker = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--accent')) }));
+  group.add(tipMarker);
+  scene.add(group);
+  robotParts = { group, links, joints };
+}
+function poseRobot(q) {
+  if (!robotParts) return;
+  const f = fk(q, settings.tool), P = f.pts; // base, j1, j2, E, F3, W, flange, tip
+  const pairs = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7]];
+  pairs.forEach(([a, b], k) => placeLink(robotParts.links[k], P[a], P[b], robotParts.links[k].userData.r));
+  robotParts.joints[0].position.set(...P[2]); robotParts.joints[1].position.set(...P[3]); robotParts.joints[2].position.set(...P[5]);
+  tipMarker.position.set(...P[7]);
+}
+
+// ---------- paper view ----------
+function paperBounds() {
+  const T = sim.T; let pts = sim.ptLabels.filter(p => p.p[2] <= sim.surfZ + 5).map(p => p.p);
+  T.p.forEach((p, i) => { if (T.ink[i]) pts.push(p); });
+  if (!pts.length) pts = T.p;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  pts.forEach(p => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); });
+  const m = 30; return { minX: minX - m, maxX: maxX + m, minY: minY - m, maxY: maxY + m };
+}
+const paper = $('paper');
+new ResizeObserver(() => paperDirty = true).observe(paper);
+function drawPaper(idx, frac) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = paper.clientWidth, H = paper.clientHeight;
+  if (!W || !H) return;
+  if (paper.width !== Math.round(W * dpr)) { paper.width = Math.round(W * dpr); paper.height = Math.round(H * dpr); }
+  const ctx = paper.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = css('--paper'); ctx.fillRect(0, 0, W, H);
+  if (!sim) return;
+  const b = sim.bounds, cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+  const s = Math.min(W / (b.maxY - b.minY), H / (b.maxX - b.minX));
+  const X = p => W / 2 - (p[1] - cy) * s, Y = p => H / 2 - (p[0] - cx) * s;
+  // grid
+  const step = s > 2.5 ? 10 : s > 1 ? 25 : 50;
+  $('gridNote').textContent = `grid ${step} mm`;
+  const x0 = cx - H / 2 / s, x1 = cx + H / 2 / s, y0 = cy - W / 2 / s, y1 = cy + W / 2 / s;
+  ctx.lineWidth = 1;
+  for (let g = Math.ceil(x0 / step) * step; g <= x1; g += step) { ctx.strokeStyle = css(g % (step * 5) === 0 ? '--grid2' : '--grid'); ctx.beginPath(); ctx.moveTo(0, Y([g, 0])); ctx.lineTo(W, Y([g, 0])); ctx.stroke(); }
+  for (let g = Math.ceil(y0 / step) * step; g <= y1; g += step) { ctx.strokeStyle = css(g % (step * 5) === 0 ? '--grid2' : '--grid'); ctx.beginPath(); ctx.moveTo(X([0, g]), 0); ctx.lineTo(X([0, g]), H); ctx.stroke(); }
+  const T = sim.T, n = T.p.length;
+  const kc = { J: css('--mJ'), L: css('--mL'), C: css('--mC'), B: css('--mB'), S: css('--mB') };
+  // air moves (projected)
+  if ($('showAir').checked) {
+    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2; ctx.globalAlpha = 0.7;
+    for (let i = 1; i < n; i++) if (!(T.ink[i] && T.ink[i - 1])) { ctx.strokeStyle = kc[T.kind[i]]; ctx.beginPath(); ctx.moveTo(X(T.p[i - 1]), Y(T.p[i - 1])); ctx.lineTo(X(T.p[i]), Y(T.p[i])); ctx.stroke(); }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  // ghost of the full drawing
+  if ($('showGhost').checked) {
+    ctx.lineWidth = 1; ctx.strokeStyle = css('--grid2'); ctx.beginPath();
+    for (let i = 1; i < n; i++) if (T.ink[i] && T.ink[i - 1]) { ctx.moveTo(X(T.p[i - 1]), Y(T.p[i - 1])); ctx.lineTo(X(T.p[i]), Y(T.p[i])); }
+    ctx.stroke();
+  }
+  // ink so far
+  ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const ink = css('--ink'), bad = css('--bad');
+  const seg = (a, b2, col) => { ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b2), Y(b2)); ctx.stroke(); };
+  for (let i = 1; i <= idx && i < n; i++) if (T.ink[i] && T.ink[i - 1]) seg(T.p[i - 1], T.p[i], T.crash[i] ? bad : ink);
+  let tip = T.p[idx];
+  if (idx + 1 < n) { tip = lerp3(T.p[idx], T.p[idx + 1], frac); if (T.ink[idx] && T.ink[idx + 1]) seg(T.p[idx], tip, T.crash[idx + 1] ? bad : ink); }
+  // taught points
+  ctx.font = `500 11px "IBM Plex Mono", monospace`; ctx.textBaseline = 'middle';
+  const placed = [];
+  sim.ptLabels.forEach(pt => {
+    const px = X(pt.p), py = Y(pt.p);
+    ctx.fillStyle = css('--fg'); ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+    let ly = py - 10; while (placed.some(q => Math.abs(q[0] - px) < 40 && Math.abs(q[1] - ly) < 12)) ly += 13;
+    placed.push([px, ly]); ctx.fillStyle = css('--muted'); ctx.fillText(pt.label, px + 6, ly);
+  });
+  // tool tip
+  const h = tip[2] - sim.surfZ, tx = X(tip), ty = Y(tip);
+  ctx.strokeStyle = css('--accent'); ctx.fillStyle = css('--accent'); ctx.lineWidth = 2;
+  if (h <= settings.tol) { ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI * 2); ctx.fill(); }
+  else { const r = Math.min(26, 5 + h / 12); ctx.beginPath(); ctx.arc(tx, ty, r, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(tx - 4, ty); ctx.lineTo(tx + 4, ty); ctx.moveTo(tx, ty - 4); ctx.lineTo(tx, ty + 4); ctx.stroke(); }
+}
+
+// ---------- readout ----------
+function renderReadout(idx, q, p) {
+  // between samples i and i+1 the arm is executing the move that sample i+1 belongs to
+  const T = sim.T, line = T.line[Math.min(idx + 1, T.line.length - 1)], ins = programs[active].mn.find(m => m.num === line);
+  const R = fk(q, settings.tool).R, wpr = rToWpr(R), h = p[2] - sim.surfZ;
+  const state = T.crash[idx] ? '<span class="pen crash">BELOW SURFACE</span>' : h <= settings.tol ? '<span class="pen down">ON SURFACE</span>' : `<span class="pen up">${fmt(h, 0)} mm ABOVE</span>`;
+  $('readout').innerHTML = `<div class="cur">${line}: ${esc(ins ? ins.text : '')}</div>
+    <div class="rows"><span><span class="k">X</span> ${fmt(p[0])}</span><span><span class="k">Y</span> ${fmt(p[1])}</span><span><span class="k">Z</span> ${fmt(p[2])}</span>
+    <span><span class="k">W</span> ${fmt(wpr[0])}</span><span><span class="k">P</span> ${fmt(wpr[1])}</span><span><span class="k">R</span> ${fmt(wpr[2])}</span>
+    ${q.map((v, j) => `<span><span class="k">J${j + 1}</span> ${fmt(v)}</span>`).join('')}</div>${state}`;
+  document.querySelectorAll('#listing li.active').forEach(li => li.classList.remove('active'));
+  const li = document.querySelector(`#listing li[data-line="${line}"]`);
+  if (li) { li.classList.add('active'); const L = $('listing'); if (li.offsetTop < L.scrollTop || li.offsetTop + li.offsetHeight > L.scrollTop + L.clientHeight) L.scrollTop = li.offsetTop - L.clientHeight / 2 + li.offsetHeight / 2; }
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (sim) {
+    if (playing) { t += dt * speed; if (t >= sim.total) { t = sim.total; playing = false; updatePlay(); } paperDirty = true; }
+    const { i, f } = sampleAt(t), T = sim.T, j = Math.min(i + 1, T.p.length - 1);
+    const q = lerpN(T.q[i], T.q[j], f), p = lerp3(T.p[i], T.p[j], f);
+    poseRobot(q);
+    if (inkObj) { const ends = inkObj.userData.ends; let lo = 0, hi = ends.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ends[m] <= i) lo = m + 1; else hi = m; } inkObj.geometry.setDrawRange(0, lo * 2); }
+    if (paperDirty) { drawPaper(i, f); paperDirty = false; }
+    if (i !== lastIdx || playing) { renderReadout(i, q, p); lastIdx = i; }
+    $('scrub').value = Math.round(1000 * t / Math.max(sim.total, 1e-6));
+    $('timeOut').textContent = `${t.toFixed(2)} / ${sim.total.toFixed(2)} s`;
+  }
+  if (renderer) { controls.update(); renderer.render(scene, camera); }
+  requestAnimationFrame(frame);
+}
+
+// theme changes: rebuild colors
+const onTheme = () => { if (sim) { buildScene(); paperDirty = true; } };
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+init3D();
+addProgram($('src-1').textContent.trim(), true);
+selectProgram(0);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { paperDirty = true; if (sim) buildScene(); });
+requestAnimationFrame(frame);
+
+</script>
+
+</body>
+</html>
