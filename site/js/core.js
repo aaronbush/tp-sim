@@ -658,7 +658,7 @@ function simulate(rootName, programs, st) {
       } else q = P.joints.slice();
     } else {
       // A PR with no stored value used as a target is treated as the default home (joints)
-      if (!S.PR[n]) S.PR[n] = { type: 'joint', v: (st.start || HOME).slice(), assumed: true };
+      if (!S.PR[n]) { S.PR[n] = { type: 'joint', v: (st.start || HOME).slice(), assumed: true }; changed(); }
       const pr = S.PR[n];
       if (pr.type === 'cart') local = { p: pr.v.slice(0, 3), R: wprToR(pr.v[3], pr.v[4], pr.v[5]), uf: S.uf };
       else q = pr.v.slice();

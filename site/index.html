@@ -47,6 +47,26 @@
         <div class="speeds" id="speeds" role="group" aria-label="Playback speed">
           <button type="button" data-s="0.25">¼×</button><button type="button" data-s="0.5">½×</button><button type="button" data-s="1" aria-pressed="true">1×</button><button type="button" data-s="2">2×</button><button type="button" data-s="4">4×</button>
         </div>
+        <button class="btn teachbtn" id="teachBtn" type="button" aria-pressed="false" title="Jog the robot and record points">Teach</button>
+      </div>
+      <div class="jogbar" id="jogbar" hidden>
+        <div class="jrow">
+          <div class="seg" id="jogCoord" role="group" aria-label="Jog coordinates">
+            <button type="button" data-c="joint">Joint</button><button type="button" data-c="world" aria-pressed="true">World</button><button type="button" data-c="user">User</button><button type="button" data-c="tool">Tool</button>
+          </div>
+          <label class="jl" for="jogStep">Step <select id="jogStep"><option value="0.1">0.1</option><option value="1">1</option><option value="5">5</option><option value="10" selected>10</option><option value="50">50</option></select> <span id="jogUnit">mm / °</span></label>
+          <div class="seg" id="dragMode" role="group" aria-label="Drag direction">
+            <button type="button" data-m="xy" aria-pressed="true">Drag X/Y</button><button type="button" data-m="z">Drag Z</button>
+          </div>
+        </div>
+        <div class="jgrid" id="jogGrid"></div>
+        <div class="jrow rec">
+          <span class="recctx" id="recCtx"></span>
+          <label class="jl" for="recType">Move <select id="recType"><option value="L">L linear</option><option value="J">J joint</option></select></label>
+          <button class="btn play" id="recNew" type="button">Record new point</button>
+          <button class="btn" id="recTouch" type="button" disabled>Touch up</button>
+        </div>
+        <p class="hint" id="jogHint">Drag the yellow handle at the tool tip, or use the jog buttons. Click a program line to choose where a new point goes.</p>
       </div>
     </section>
 
@@ -121,5 +141,6 @@
 <script src="js/core.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/app.js"></script>
+<script src="js/teach.js"></script>
 </body>
 </html>

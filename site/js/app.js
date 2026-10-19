@@ -225,6 +225,7 @@ function gotoStep(i) {
 }
 function jumpToLine(line) {
   if (!sim) return;
+  if (teachHook && teachHook.active()) { teachHook.onLine(line); return; }
   const S = sim.steps, name = sim.activeName;
   const match = (sp) => sp.prog === name ? sp.line === line : sp.rootLine === line;
   let i = S.findIndex((sp, k) => k > currentStep() && match(sp));
@@ -376,6 +377,7 @@ const toolAt = (i) => { const sg = sim.segs[sim.T.seg[Math.min(i + 1, sim.T.seg.
 
 // ---------- 3D ----------
 let renderer = null, scene, camera, controls, robotParts = null, pathGroup = null, inkObj = null, tipMarker = null, toolAxes = null;
+let teachHook = null, teachTip = null; // set by teach.js
 const view = $('view3d');
 function init3D() {
   try {
@@ -551,6 +553,7 @@ function drawPaper(idx, frac) {
   for (let i = 1; i <= idx && i < n; i++) if (T.ink[i] && T.ink[i - 1]) seg(T.p[i - 1], T.p[i], T.crash[i] ? bad : ink);
   let tip = T.p[idx];
   if (idx + 1 < n) { tip = lerp3(T.p[idx], T.p[idx + 1], frac); if (T.ink[idx] && T.ink[idx + 1]) seg(T.p[idx], tip, T.crash[idx + 1] ? bad : ink); }
+  if (teachTip) tip = teachTip;
   ctx.font = `500 11px "IBM Plex Mono", monospace`; ctx.textBaseline = 'middle';
   const placed = [], fgc = css('--fg'), mut = css('--muted');
   sim.ptLabels.forEach(pt => {
@@ -586,7 +589,8 @@ function renderReadout(si, q, p, f) {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  if (sim && sim.T.p.length) {
+  if (teachHook && teachHook.active()) teachHook.frame();
+  else if (sim && sim.T.p.length) {
     if (playing) { t += dt * speed; if (t >= sim.total) { t = sim.total; playing = false; updatePlay(); } paperDirty = true; }
     const { i, f } = sampleAt(t), T = sim.T, j = Math.min(i + 1, T.p.length - 1);
     const q = lerpN(T.q[i], T.q[j], f), p = lerp3(T.p[i], T.p[j], f);

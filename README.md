@@ -33,6 +33,10 @@ It works with the `.ls` export format used by FANUC controllers. This project is
 - **Registers & I/O panel:** shows register, position register and output values at the current line; changed values are highlighted.
 - **Inputs:** you set `DI/RI/GI` values here, and can make an input flip after a few seconds so `WAIT DI[ ]=ON` releases.
 - **Stepping:** **◀ Line / Line ▶** steps one executed line at a time, through loops and calls. Clicking a line in the editor jumps to where it runs.
+- **Teach mode:** press **Teach** to take the arm off playback and position it yourself, then record what you've set up.
+  - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z** or Shift), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
+  - **Record new point** adds a `P[n]` in the active user/tool frame and inserts an `L` or `J` move after the cursor line.
+  - **Touch up** replaces the point on the cursor line. It takes out the line's `Offset,PR[ ]` if there is one; on a `PR[ ]` line it sets that register's starting value instead.
 - **Views:** the arm animates in 3D with World, user-frame and tool-frame axes. A top-down "paper" view shows what the tool draws.
 - **Findings:** flags common problems. Motion:
   - a joint move used to draw on the part
@@ -101,6 +105,7 @@ The tests run the interpreter against the example programs and a set of edge cas
 - `site/js/core.js`: kinematics, `.ls` parsing, the TP interpreter and motion simulation (no DOM).
 - `site/js/editor.js`: CodeMirror setup, including the TP language, suggestions, run counts and the executing-line highlight.
 - `site/js/app.js`: page wiring, the 3D view, the paper view and the panels.
+- `site/js/teach.js`: teach mode (drag, jog, record and touch up).
 - `site/vendor/`: three.js r128, and a CodeMirror 6 bundle built from [`tools/codemirror`](tools/codemirror) (`npm install && npm run build`).
 
 ## Deployment

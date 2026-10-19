@@ -213,6 +213,10 @@ const TPEditor = (() => {
         view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) });
       },
       cursorLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
+      replaceLine(line, text) {
+        const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
+        view.dispatch({ changes: { from: l.from, to: l.to, insert: text }, selection: { anchor: l.from + text.length } });
+      },
       insertLineAfter(line, text) {
         const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
         view.dispatch({ changes: { from: l.to, insert: '\n' + text }, selection: { anchor: l.to + 1 + text.length } });
