@@ -1,0 +1,34 @@
+{
+  "examples": [
+    {
+      "file": "box_ab.ls",
+      "title": "Box (motion types)"
+    },
+    {
+      "file": "loop_squares.ls",
+      "title": "Loop: LBL / JMP / IF"
+    },
+    {
+      "file": "main_select.ls",
+      "title": "SELECT + CALL",
+      "also": [
+        "a_square.ls",
+        "a_triangle.ls"
+      ],
+      "inputs": {
+        "GI[1]": {
+          "v": 1
+        }
+      }
+    },
+    {
+      "file": "pick_place.ls",
+      "title": "Pick & place: FOR / WAIT / RO / UFRAME",
+      "inputs": {
+        "DI[1]": {
+          "v": 1
+        }
+      }
+    }
+  ]
+}

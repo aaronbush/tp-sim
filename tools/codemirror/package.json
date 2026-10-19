@@ -1,0 +1,19 @@
+{
+  "name": "tp-sim-codemirror-bundle",
+  "private": true,
+  "description": "Builds site/vendor/codemirror.min.js",
+  "scripts": {
+    "build": "esbuild entry.js --bundle --minify --format=iife --global-name=CM --legal-comments=none --outfile=../../site/vendor/codemirror.min.js"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "@lezer/highlight": "^1.2.5",
+    "codemirror": "^6.0.2",
+    "esbuild": "^0.28.2"
+  }
+}
