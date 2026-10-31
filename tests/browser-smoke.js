@@ -45,6 +45,15 @@ server.listen(0, async () => {
     for (let k = 0; k < 30 && !args; k++) { await page.click('#stepBtn'); args = /AR\[1\]/.test(await page.textContent('#statebody')); }
     check(`${w}px: arguments show inside PICK_PART`, args);
     if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `args-${w}-${scheme}.png`), fullPage: true }); }
+    // data screens: after-run values, keep them, comments, PR rows
+    check(`${w}px: data screen shows R[1] after run`, (await page.textContent('#arR1')).trim() === '3');
+    await page.click('#dataKeep'); await page.waitForTimeout(400);
+    check(`${w}px: keep copies after-run values to start`, await page.inputValue('[data-dr="1"]') === '3');
+    await page.fill('[data-dr="1"]', ''); await page.fill('[data-drc="1"]', 'parts'); await page.press('[data-drc="1"]', 'Enter'); await page.waitForTimeout(500);
+    check(`${w}px: data comment shows in the I/O panel`, /parts/.test(await page.textContent('#statebody')));
+    await page.click('#dtabPR'); await page.selectOption('[data-dprt="1"]', 'joint'); await page.waitForTimeout(400);
+    check(`${w}px: PR row gets six values`, (await page.$$('[data-dpr="1"]')).length === 6);
+    await page.click('#dtabR');
     // playing must not scroll the page to the editor (phones stack the panels)
     await page.evaluate(() => document.getElementById('view3d').scrollIntoView({ block: 'start' }));
     const y0 = await page.evaluate(() => scrollY);

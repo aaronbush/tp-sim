@@ -107,6 +107,22 @@
     </section>
   </div>
 
+  <section class="panel" id="dataPanel">
+    <div class="panel-h">
+      <div class="ptabs" role="tablist" aria-label="Data">
+        <button type="button" role="tab" id="dtabR" aria-selected="true" aria-controls="dataR">Registers</button>
+        <button type="button" role="tab" id="dtabPR" aria-selected="false" aria-controls="dataPR">Position Reg</button>
+      </div>
+      <div class="head-actions">
+        <button class="btn" id="dataKeep" type="button" title="Copy the after-run values into the start values">Keep after-run values</button>
+        <button class="btn" id="dataMore" type="button">+10 rows</button>
+      </div>
+    </div>
+    <p class="hint datahint">Values every program starts from, shared by all your programs, like the DATA screens on the pendant. <b>After run</b> shows what the last run left in each one; highlighted rows are used by the open program.</p>
+    <div class="databody" id="dataR" role="tabpanel" aria-labelledby="dtabR"></div>
+    <div class="databody" id="dataPR" role="tabpanel" aria-labelledby="dtabPR" hidden></div>
+  </section>
+
   <div class="grid-low">
     <section class="panel">
       <div class="panel-h"><h2>Findings</h2><span class="sub" id="issueCount"></span></div>
@@ -118,8 +134,6 @@
       <div class="settings" id="settings">
         <div class="field" id="toolFields"></div>
         <div class="field" id="ufFields"></div>
-        <div class="field" id="prFields"></div>
-        <div class="field" id="rFields"></div>
         <div class="field" id="macroFields"></div>
         <div class="field">
           <label for="comp">Pen spring travel</label>

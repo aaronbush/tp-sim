@@ -33,12 +33,13 @@ It works with the `.ls` export format used by FANUC controllers. This project is
   - `Offset,PR[ ]`, `Tool_Offset,PR[ ]` and `OFFSET CONDITION`.
   - User and tool frames.
 - **Registers & I/O panel:** shows register, position register and output values at the current line; changed values are highlighted. Inside a called program it also shows the `AR[ ]` arguments it was given.
+- **Data screens:** **Registers** and **Position Reg** tabs work like the pendant's DATA screens. Set each `R[ ]` / `PR[ ]` once, with a comment, and every program starts from those values. An **After run** column shows what the last run left in each register, and **Keep after-run values** copies them in when you want them to stick. Rows the open program uses are highlighted; a • marks ones it reads before setting.
 - **Inputs:** you set `DI/RI/GI` values here, and can make an input flip after a few seconds so `WAIT DI[ ]=ON` releases.
 - **Stepping:** **◀ Line / Line ▶** steps one executed line at a time, through loops and calls. Clicking a line in the editor jumps to where it runs.
 - **Teach mode:** press **Teach** to take the arm off playback and position it yourself, then record what you've set up.
   - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z** or Shift), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
   - **Record new point** adds a `P[n]` in the active user/tool frame and inserts an `L` or `J` move after the cursor line.
-  - **Touch up** replaces the point on the cursor line. It takes out the line's `Offset,PR[ ]` if there is one; on a `PR[ ]` line it sets that register's starting value instead.
+  - **Touch up** replaces the point on the cursor line. It takes out the line's `Offset,PR[ ]` if there is one; on a `PR[ ]` line it sets that register's start value in **Position Reg** instead.
 - **Views:** the arm animates in 3D with World, user-frame and tool-frame axes. A top-down "paper" view shows what the tool draws.
 - **Findings:** flags common problems. Motion:
   - a joint move used to draw on the part
@@ -81,7 +82,7 @@ This is a study aid, not a certified simulator.
 
 - **Arm model:** a generic small 6-axis arm (330 mm upper arm, 335 mm forearm), front / elbow-up configuration only.
 - **Approximate timing:** CNT blending, acceleration and logic timing are approximations, so corner shapes and cycle times are estimates.
-- **Values the `.ls` file doesn't hold:** registers, PRs, frames and inputs live on the controller. Enter them on the page.
+- **Values the `.ls` file doesn't hold:** registers, PRs, frames and inputs live on the controller. Enter them on the page (registers and PRs in the Data screens).
 - **Not simulated:** system variables, `TIMER`, `PAYLOAD`, `MESSAGE`, `SKIP`, `INC`, string registers (`SR[ ]`), background logic and multiple motion groups. These are skipped and noted in Findings where it matters.
 - **WAIT timeouts:** a `WAIT … TIMEOUT,LBL[ ]` times out after the Settings value (30 s to start), standing in for the controller's setting.
 - **Exported `.ls` files are not yet verified on a controller.** Loading an `.ls` file on a controller needs the ASCII program loader option.

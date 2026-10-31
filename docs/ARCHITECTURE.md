@@ -87,12 +87,14 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 
   ```js
   { tools: {n: [6]}, uframes: {n: [6]}, pr: {n: {type:'joint'|'cart', v:[6]}}, r: {n: number},
+    rCmt: {n: text}, prCmt: {n: text}, dataRows: {R?: n, PR?: n},
     inputs: {'DI[1]': {v, at?, to?}}, macros: {'OPEN HAND': 'GRIP_OPEN'}, comp, tol, maxTime, waitTimeout }
   ```
 
   `settingsForRun()` adds `start`, the home joints taken from the first PR the root program moves to.
 - **Which program runs.** The active tab is the root program. Every open program can be the target of a CALL or a macro. `reachableFrom()` (following macros through `macroTarget()`) limits the settings panels and the Registers & I/O panel to programs the root actually calls.
-- **Settings panels.** They only ask for starting values the program doesn't set itself (`refs.prNeed`, `refs.rNeed`), and are rebuilt only when that set changes, so typing in settings doesn't lose focus.
+- **Settings panels.** Tool frames, user frames and macros. They are rebuilt only when the set of frames/macros the program uses changes, so typing in settings doesn't lose focus.
+- **Data screens.** `settings.r` / `settings.pr` are global start values shared by every program, edited in the Data panel (`renderData`). Rows run from 1 to the highest register used, set or commented (at least 10, more with **+10 rows**). The After run column reads the last snapshot of `sim.snaps`. `updateData()` rebuilds the panel on each run unless the change came from the panel itself (`dataEditing`) or a box in it has focus; then only the after-run cells update, so Tab moves between boxes normally. Comments in `rCmt`/`prCmt` override the ones collected from program lines (`progComments`). `refs.rNeed`/`refs.prNeed` (read before set) mark rows with a •.
 - **Playback.**
   - `t` is the time; `sampleAt(t)` gives the timeline sample.
   - `currentStep()` is the pinned step when stepping, otherwise `stepAt(t)`.
