@@ -5,7 +5,9 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
 ## Current state
 
 - **PR #1** (interpreter, editor, Registers & I/O panel, teach mode, examples, tests) was merged to `main` on 2026-10-30.
-- `macros-callargs-pulse` adds macros, CALL arguments, timed PULSE and a WAIT timeout setting.
+- Macros, CALL arguments, timed PULSE and a WAIT timeout setting (PR #2), and a page-scroll fix for phones (PR #3), are merged.
+- `data-screens` adds global Registers / Position Reg screens with comments and after-run values.
+- **Data screen ideas:** I/O comments (DI/DO) in a third tab, and register comments in editor suggestions.
 
 ## Needs verification
 

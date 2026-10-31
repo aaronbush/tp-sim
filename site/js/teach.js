@@ -134,7 +134,7 @@
     if (ins.tgt.kind === 'PR') {
       settings.pr[n] = { type: 'cart', v: v6.map(x => +x.toFixed(3)) }; saveSettings();
       lastRefsKey = ''; rerun(true);
-      setHint(`PR[${n}] starting value set to the current tool position (Settings › Position registers).${note}`); return;
+      setHint(`PR[${n}] start value set to the current tool position (Data › Position Reg).${note}`); return;
     }
     const old = parsePositions(e.posText)[n];
     const block = formatPosition(n, v6, c.uf, c.ut, old ? old.cmt : '');

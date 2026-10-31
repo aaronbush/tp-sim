@@ -193,3 +193,26 @@ table.regs tr.chg td { background: color-mix(in srgb, var(--accent) 18%, transpa
 .recctx b { color: var(--fg); font-weight: 600; }
 #jogHint { margin: 0; }
 @media (max-width: 640px) { .jgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* data screens */
+.datahint { margin: 0; padding: 8px 12px 0; }
+.databody { padding: 8px 12px 12px; max-height: 420px; overflow: auto; }
+.dtab { width: 100%; max-width: 760px; border-collapse: collapse; font: 12.5px var(--f-mono); }
+.dtab th { text-align: left; font: 600 11px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.dtab td { padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.dtab td input { width: 100%; box-sizing: border-box; }
+.dtab td:first-child { width: 6ch; white-space: nowrap; }
+.dtab td:nth-child(3) { width: 9ch; }
+.dtab td.ar { text-align: right; white-space: nowrap; color: var(--muted); }
+.dtab td.ar.chg, .dpar.chg { color: var(--fg); font-weight: 600; }
+.rn { color: var(--muted); }
+.used .rn, .need .rn { color: var(--reg); font-weight: 600; }
+.need .rn::after { content: ' •'; color: var(--warn); }
+.dpr { max-width: 760px; padding: 8px 0; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.dprh { display: grid; grid-template-columns: 6ch minmax(0, 1fr) auto; gap: 8px; align-items: center; font: 12.5px var(--f-mono); }
+.dtab td input, .dprh input, .dprh select { min-width: 0; font: 12.5px var(--f-mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper); color: var(--fg); }
+.pv { display: grid; gap: 2px; font: 11px var(--f-mono); color: var(--muted); min-width: 0; }
+.pv input { min-width: 0; width: 100%; box-sizing: border-box; }
+.dpar { font: 12px var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.dpar span { font: 600 11px var(--f-display); letter-spacing: .08em; text-transform: uppercase; margin-right: 6px; }
+@media (max-width: 640px) { .prgrid.prgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
