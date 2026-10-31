@@ -196,9 +196,22 @@ const TPEditor = (() => {
         suppress = false;
       },
       setExecLine(line, sub, scroll) {
-        const effects = [setExec.of({ line, sub })];
-        if (scroll && line && line <= view.state.doc.lines) effects.push(EditorView.scrollIntoView(view.state.doc.line(line).from, { y: 'nearest', yMargin: 40 }));
-        view.dispatch({ effects });
+        view.dispatch({ effects: setExec.of({ line, sub }) });
+        if (!scroll || !line || line > view.state.doc.lines) return;
+        // Scroll only the editor's own box. EditorView.scrollIntoView also scrolls the page,
+        // which on a phone yanks the 3D view away while the program plays.
+        const pos = view.state.doc.line(line).from;
+        view.requestMeasure({
+          read: () => {
+            const b = view.lineBlockAt(pos), box = view.scrollDOM.getBoundingClientRect();
+            return { top: view.documentTop + b.top, bottom: view.documentTop + b.bottom, box };
+          },
+          write: ({ top, bottom, box }) => {
+            const m = Math.min(40, box.height / 4);
+            if (top < box.top + m) view.scrollDOM.scrollTop -= box.top + m - top;
+            else if (bottom > box.bottom - m) view.scrollDOM.scrollTop += bottom - (box.bottom - m);
+          }
+        });
       },
       setCounts(counts, ran) { if (opts.language === 'tp') view.dispatch({ effects: setCounts.of({ counts, ran }) }); },
       setDiagnostics(list) {

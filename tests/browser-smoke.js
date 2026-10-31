@@ -45,6 +45,12 @@ server.listen(0, async () => {
     for (let k = 0; k < 30 && !args; k++) { await page.click('#stepBtn'); args = /AR\[1\]/.test(await page.textContent('#statebody')); }
     check(`${w}px: arguments show inside PICK_PART`, args);
     if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `args-${w}-${scheme}.png`), fullPage: true }); }
+    // playing must not scroll the page to the editor (phones stack the panels)
+    await page.evaluate(() => document.getElementById('view3d').scrollIntoView({ block: 'start' }));
+    const y0 = await page.evaluate(() => scrollY);
+    await page.click('#playBtn'); await page.waitForTimeout(3000);
+    const y1 = await page.evaluate(() => scrollY); await page.click('#playBtn');
+    check(`${w}px: playback leaves the page where it is`, Math.abs(y1 - y0) < 2, `${y0} -> ${y1}`);
     // teach mode
     await page.click('#teachBtn'); await page.waitForTimeout(200);
     await page.click('#jogGrid button[data-ax="0"][data-s="1"]');
