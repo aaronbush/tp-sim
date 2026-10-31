@@ -100,6 +100,8 @@ node tests/core.test.js
 
 The tests run the interpreter against the example programs and a set of edge cases.
 
+`node tests/browser-smoke.js` loads the real page in headless Chromium at desktop and phone width; it needs Playwright. See [`CLAUDE.md`](CLAUDE.md) for contributor notes and [`docs/`](docs/) for architecture and the backlog.
+
 ## Layout
 
 - `site/js/core.js`: kinematics, `.ls` parsing, the TP interpreter and motion simulation (no DOM).
