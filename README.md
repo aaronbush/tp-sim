@@ -37,11 +37,12 @@ It works with the `.ls` export format used by FANUC controllers. This project is
 - **Inputs:** you set `DI/RI/GI` values here, and can make an input flip after a few seconds so `WAIT DI[ ]=ON` releases.
 - **Stepping:** **◀ Line / Line ▶** steps one executed line at a time, through loops and calls. Clicking a line in the editor jumps to where it runs.
 - **Teach mode:** press **Teach** to take the arm off playback and position it yourself, then record what you've set up.
-  - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z** or Shift), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
+  - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z**, Shift, or the height strip), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
   - **Record new point** adds a `P[n]` in the active user/tool frame and inserts an `L` or `J` move after the cursor line.
   - **Touch up** replaces the point on the cursor line. It takes out the line's `Offset,PR[ ]` if there is one; on a `PR[ ]` line it sets that register's start value in **Position Reg** instead.
 - **Help:** the **?** button (or the <kbd>?</kbd> key) opens a short guide: getting started, teaching points, registers, program features, the 3D view and shortcuts. The **?** in teach mode opens it at the teach steps.
-- **Views:** the arm animates in 3D with World, user-frame and tool-frame axes. A top-down "paper" view shows what the tool draws.
+- **Views:** the arm animates in 3D with World, user-frame and tool-frame axes. A top-down "paper" view shows what the tool draws, with a **height strip** beside it: the tool's height above the surface on a vertical scale, the crash limit, and each taught point's height. In teach mode, drag up or down in the strip to move the tool in Z.
+- **Phones:** on narrow screens the 3D view stays at the top and tabs at the bottom switch between **Run**, **Teach**, **Program**, **Data** and **More** (Findings, Paper, Settings). The height strip sits on the 3D view's edge, and Record / Touch up stay in reach while you jog. Buttons are larger on touch screens.
 - **Findings:** flags common problems. Motion:
   - a joint move used to draw on the part
   - no approach point above the surface

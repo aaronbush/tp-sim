@@ -26,11 +26,12 @@
   </header>
 
   <div class="grid-main">
-    <section class="panel">
+    <section class="panel" id="workPanel">
       <div class="panel-h"><h2>Work cell</h2><span class="sub" id="progMeta"></span></div>
       <div id="view3d">
         <div class="readout" id="readout"></div>
-        <div class="legend">
+        <button class="btn keybtn" id="keyBtn" type="button" aria-expanded="false" aria-controls="legend">Key</button>
+        <div class="legend" id="legend">
           <span><i style="background:var(--mJ)"></i>J joint</span>
           <span><i style="background:var(--mL)"></i>L linear</span>
           <span><i style="background:var(--mC)"></i>C circular</span>
@@ -39,7 +40,7 @@
           <span><i style="background:var(--bad)"></i>below surface</span>
         </div>
       </div>
-      <div class="transport">
+      <div class="transport" data-pane="run">
         <button class="btn play" id="playBtn" type="button">▶ Play</button>
         <button class="btn" id="restartBtn" type="button" title="Back to start" aria-label="Back to start">⏮</button>
         <button class="btn stepb" id="prevBtn" type="button" title="Previous line">◀ Line</button>
@@ -51,7 +52,7 @@
         </div>
         <button class="btn teachbtn" id="teachBtn" type="button" aria-pressed="false" title="Jog the robot and record points">Teach</button>
       </div>
-      <div class="jogbar" id="jogbar" hidden>
+      <div class="jogbar" id="jogbar" data-pane="teach" hidden>
         <div class="jrow">
           <div class="seg" id="jogCoord" role="group" aria-label="Jog coordinates">
             <button type="button" data-c="joint">Joint</button><button type="button" data-c="world" aria-pressed="true">World</button><button type="button" data-c="user">User</button><button type="button" data-c="tool">Tool</button>
@@ -63,18 +64,20 @@
         </div>
         <div class="jgrid" id="jogGrid"></div>
         <div class="jrow rec">
+          <span class="linepick"><button class="btn" type="button" id="recPrev" aria-label="Record after the previous line">▲</button><button class="btn" type="button" id="recNext" aria-label="Record after the next line">▼</button></span>
           <span class="recctx" id="recCtx"></span>
-          <label class="jl" for="recType">Move <select id="recType"><option value="L">L linear</option><option value="J">J joint</option></select></label>
-          <button class="btn play" id="recNew" type="button">Record new point</button>
+          <span class="brk" aria-hidden="true"></span>
+          <label class="jl" for="recType"><span class="long">Move </span><select id="recType"><option value="L">L linear</option><option value="J">J joint</option></select></label>
+          <button class="btn play" id="recNew" type="button">Record<span class="long"> new point</span></button>
           <button class="btn" id="recTouch" type="button" disabled>Touch up</button>
         </div>
         <div class="jrow jhint"><button class="btn helpbtn" type="button" data-help="help-teach" aria-label="How teach mode works" title="How teach mode works">?</button><p class="hint" id="jogHint">Drag the yellow handle at the tool tip, or use the jog buttons. Click a program line to choose where a new point goes.</p></div>
       </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-h"><h2>Paper · top view</h2><span class="sub">+X ↑ &nbsp; +Y ←</span></div>
-      <div id="paperWrap"><canvas id="paper"></canvas></div>
+    <section class="panel" id="paperPanel" data-pane="more">
+      <div class="panel-h"><h2>Paper · top view</h2><span class="sub">+X ↑ &nbsp; +Y ← <span class="hlab">&nbsp;│&nbsp; height</span></span></div>
+      <div id="paperWrap"><canvas id="paper"></canvas><canvas id="sideZ" aria-label="Tool height above the surface"></canvas></div>
       <div class="paper-foot">
         <label><input type="checkbox" id="showAir" checked> air moves</label>
         <label><input type="checkbox" id="showGhost" checked> full drawing</label>
@@ -84,7 +87,7 @@
   </div>
 
   <div class="grid-mid">
-    <section class="panel" id="editorPanel">
+    <section class="panel" id="editorPanel" data-pane="program">
       <div class="panel-h">
         <div class="ptabs" role="tablist" aria-label="Program parts">
           <button type="button" role="tab" id="tabProg" aria-selected="true" aria-controls="edProg">Program</button>
@@ -101,14 +104,14 @@
       <div class="edfoot"><span id="edStatus">Line numbers are the TP line numbers. Edits re-run the simulation.</span><span><kbd>Ctrl</kbd>+<kbd>Space</kbd> suggestions</span></div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="statePanel" data-pane="run">
       <div class="panel-h"><h2>Registers &amp; I/O</h2><span class="sub" id="stateSub"></span></div>
       <div class="statebar" id="statebar"></div>
       <div class="statebody" id="statebody"></div>
     </section>
   </div>
 
-  <section class="panel" id="dataPanel">
+  <section class="panel" id="dataPanel" data-pane="data">
     <div class="panel-h">
       <div class="ptabs" role="tablist" aria-label="Data">
         <button type="button" role="tab" id="dtabR" aria-selected="true" aria-controls="dataR">Registers</button>
@@ -125,12 +128,12 @@
   </section>
 
   <div class="grid-low">
-    <section class="panel">
+    <section class="panel" id="findingsPanel" data-pane="more">
       <div class="panel-h"><h2>Findings</h2><span class="sub" id="issueCount"></span></div>
       <div class="summary" id="summary"></div>
       <ul id="issues"></ul>
     </section>
-    <section class="panel">
+    <section class="panel" id="settingsPanel" data-pane="more">
       <div class="panel-h"><h2>Settings</h2></div>
       <div class="settings" id="settings">
         <div class="field" id="toolFields"></div>
@@ -157,6 +160,14 @@
   </div>
 </div>
 
+<nav class="phonetabs" id="phoneTabs" aria-label="Sections">
+  <button type="button" data-pane="run" aria-pressed="true">Run</button>
+  <button type="button" data-pane="teach" aria-pressed="false">Teach</button>
+  <button type="button" data-pane="program" aria-pressed="false">Program</button>
+  <button type="button" data-pane="data" aria-pressed="false">Data</button>
+  <button type="button" data-pane="more" aria-pressed="false">More<span class="badge-n" id="tabBadge" hidden></span></button>
+</nav>
+
 <dialog id="helpDlg" aria-labelledby="helpTitle">
   <div class="help-h"><h2 id="helpTitle">How to use this</h2><button class="btn" type="button" id="helpClose" aria-label="Close help">Close</button></div>
   <div class="help-b">
@@ -167,12 +178,13 @@
       <li>Press <b>▶ Play</b> to watch it run, or step one line at a time with <b>Line ▶</b> and <b>◀ Line</b>. Drag the slider to scrub.</li>
       <li>Click any line in the editor to jump to where it runs.</li>
       <li>Check <b>Findings</b> for problems; click one to go to its line.</li>
-    </ol></section>
+    </ol>
+    <p>On a phone the robot stays at the top and the tabs at the bottom switch between <b>Run</b>, <b>Teach</b>, <b>Program</b>, <b>Data</b> and <b>More</b> (Findings, Paper, Settings). Tap the readout in the 3D view for coordinates, and <b>Key</b> for the path colors.</p></section>
 
     <section id="help-teach"><h3>Teach a point (drag the tool head)</h3><ol>
-      <li>In the editor, click the line you want the new move to go <b>after</b>.</li>
-      <li>Press <b>Teach</b> (under the 3D view). Playback stops and the arm is yours to move.</li>
-      <li>Drag the <b>yellow ball</b> at the tool tip. A plain drag moves it across X/Y; hold <kbd>Shift</kbd>, or choose <b>Drag Z</b>, to move it up and down.<br>
+      <li>In the editor, click the line you want the new move to go <b>after</b> (or set it later with <b>▲ ▼</b> next to the Record button).</li>
+      <li>Press <b>Teach</b> (under the 3D view; on a phone, the <b>Teach</b> tab). Playback stops and the arm is yours to move.</li>
+      <li>Drag the <b>yellow ball</b> at the tool tip. A plain drag moves it across X/Y; hold <kbd>Shift</kbd>, choose <b>Drag Z</b>, or drag up and down in the <b>height strip</b>, to move it up and down.<br>
         Or jog it: choose <b>Joint</b>, <b>World</b>, <b>User</b> or <b>Tool</b>, pick a <b>Step</b>, and press the <b>−</b> / <b>+</b> buttons.</li>
       <li>Choose <b>L linear</b> or <b>J joint</b> and press <b>Record new point</b>. That adds a new <code>P[n]</code> and a move line after the line you clicked.</li>
       <li>To fix an existing point instead: click its line, move the arm, and press <b>Touch up</b>. On a <code>PR[ ]</code> line this sets the register's start value in <b>Position Reg</b>.</li>
@@ -199,6 +211,7 @@
 
     <section id="help-view"><h3>3D view</h3><ul>
       <li>Drag empty space to spin the view; scroll or pinch to zoom; right-drag (two fingers on touch) to pan.</li>
+      <li>The <b>height strip</b> shows the tool's height above the surface: the red dashed line is the crash limit, dots are taught point heights, and the scale above <code>//</code> is squeezed so tall moves don't flatten the working zone. It sits beside the Paper view, or on the 3D view's edge on a phone.</li>
       <li>Path colors: <span class="sw" style="background:var(--mJ)"></span> J joint, <span class="sw" style="background:var(--mL)"></span> L linear, <span class="sw" style="background:var(--mC)"></span> C circular, <span class="sw" style="background:var(--mB)"></span> CNT blend.</li>
       <li>The <b>Paper</b> view shows what the tool draws, seen from above.</li>
     </ul></section>

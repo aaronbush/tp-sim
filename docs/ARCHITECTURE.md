@@ -102,6 +102,8 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
   - `frame()` runs the requestAnimationFrame loop. It updates the robot, the ink draw range and the paper view, and refreshes the readout every frame. The editor highlight and the state panel update only when the step changes.
 - **3D.** The scene is rebuilt per simulation by `buildScene()`. The robot is cylinders between FK points. Paths are colored by motion type, ink is revealed over time, and axes are drawn for World, every user frame used, and the tool. `poseRobot(q, tool)` positions the arm.
 - **Paper view.** A 2D canvas top-down view (+X up, +Y left), with bounds from points near the surface. It draws air moves dashed, a ghost of the full drawing, the ink drawn so far, and the tip.
+- **Height strip.** `drawSide(tip)` draws `#sideZ`, called alongside `drawPaper` from `frame()` and teach's frame. It is linear from the crash limit up to just above the taught heights and squeezed (square-root) above a break, so start/home moves don't flatten the working zone. It publishes `sideMap = {hOf, sz}` so teach.js can turn a drag in the strip into a World Z target.
+- **Phone layout.** Below 700 px (`phoneMQ`) CSS makes the grid wrappers `display: contents`, pins `#view3d` with `position: sticky`, and shows only the elements whose `data-pane` matches `body[data-pane]` (Run, Teach, Program, Data, More), picked from the fixed `#phoneTabs` bar. `placeSide()` moves `#sideZ` onto the 3D view there. Choosing the Teach tab turns teach mode on; leaving it turns it off. Wider screens ignore `data-pane`.
 - **Hooks for teach mode.** `teachHook` and `teachTip` are globals that `teach.js` fills in. `frame()` and `jumpToLine()` defer to the hook while teach mode is on.
 
 ## teach.js
@@ -110,6 +112,7 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 - **Context.** The UF/UT for recording comes from the snapshot at the editor cursor line. If that line never ran, it falls back to the last executed line before it, then to literal `UFRAME_NUM=` / `UTOOL_NUM=` lines above.
 - **Jogging.** Joint mode adds to `q`. World and User modes translate along, or rotate about, that frame's axes at the tool point; Tool mode uses the tool's own axes. Each jog is solved with `ik` and refused if out of reach.
 - **Dragging.** A capture-phase pointer listener on `#view3d` hit-tests the handle sphere and drags on a World XY plane, or a vertical plane facing the camera for Z. It snaps to 1 mm, or 0.1 mm for small steps.
+- **Height strip and line picker.** Dragging in `#sideZ` keeps the grab offset and maps the pointer through `sideMap.hOf` to a World Z target. **▲ ▼** move the editor cursor (`setCursorLine`, which doesn't scroll the page) to choose the record line without touching the editor.
 - **Recording.** **Record** appends `formatPosition(nextIndex, …)` to `posText` and inserts an `L`/`J` line after the cursor line. **Touch up** replaces that `P[n]` block, subtracting a known `Offset,PR[]`; for a PR target it sets `settings.pr[n]` instead.
 
 ## Examples

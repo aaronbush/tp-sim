@@ -227,6 +227,10 @@ const TPEditor = (() => {
         const l = view.state.doc.line(line);
         view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) });
       },
+      setCursorLine(line) {
+        if (line < 1 || line > view.state.doc.lines) return;
+        view.dispatch({ selection: { anchor: view.state.doc.line(line).from } }); // no scrollIntoView: it would scroll the page
+      },
       cursorLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
       replaceLine(line, text) {
         const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));

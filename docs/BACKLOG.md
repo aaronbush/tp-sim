@@ -7,6 +7,8 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
 - **PR #1** (interpreter, editor, Registers & I/O panel, teach mode, examples, tests) was merged to `main` on 2026-10-30.
 - Macros, CALL arguments, timed PULSE and a WAIT timeout setting (PR #2), and a page-scroll fix for phones (PR #3), are merged.
 - `data-screens` adds global Registers / Position Reg screens with comments and after-run values.
+- **Phone layout** (bottom tabs, pinned 3D view, height strip) is on the `side-view` branch.
+- **Phone follow-up:** pendant-style insert buttons in the Program tab (J/L move, `R[ ]=`, `IF`, `WAIT`, `CALL`, `LBL`/`JMP`) so writing a program doesn't need `[ ] = :` from the phone keyboard. Also test on a real iPhone/iPad (Safari's `dvh`, safe-area insets, dragging the handle with a finger).
 - **Data screen ideas:** I/O comments (DI/DO) in a third tab, and register comments in editor suggestions.
 
 ## Needs verification
