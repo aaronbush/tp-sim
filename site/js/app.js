@@ -433,8 +433,20 @@ $('speeds').addEventListener('click', e => {
   [...$('speeds').children].forEach(x => x.setAttribute('aria-pressed', x === b));
 });
 ['showAir', 'showGhost'].forEach(id => $(id).addEventListener('change', () => paperDirty = true));
+// ---------- help ----------
+function openHelp(section) {
+  const d = $('helpDlg'); if (!d.open) d.showModal();
+  const to = section && $(section); if (to) to.scrollIntoView({ block: 'start' }); else d.querySelector('.help-b').scrollTop = 0;
+}
+$('helpBtn').addEventListener('click', () => openHelp());
+document.addEventListener('click', e => { const b = e.target.closest('[data-help]'); if (b) openHelp(b.dataset.help); });
+$('helpClose').addEventListener('click', () => $('helpDlg').close());
+$('helpDlg').addEventListener('click', e => { if (e.target === $('helpDlg')) $('helpDlg').close(); }); // click on the backdrop
+$('helpDlg').querySelector('.help-toc').addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); openHelp(a.getAttribute('href').slice(1)); });
+
 document.addEventListener('keydown', e => {
-  if (e.target.closest && e.target.closest('.cm-editor, input, textarea, select, button')) return;
+  if (e.target.closest && e.target.closest('.cm-editor, input, textarea, select, button, dialog')) return;
+  if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.code === 'Space') { e.preventDefault(); $('playBtn').click(); }
   if (e.key === 'ArrowRight' && e.altKey) { e.preventDefault(); $('stepBtn').click(); }
   if (e.key === 'ArrowLeft' && e.altKey) { e.preventDefault(); $('prevBtn').click(); }

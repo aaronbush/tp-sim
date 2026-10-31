@@ -21,6 +21,7 @@
       <button class="btn" id="newBtn" type="button">New</button>
       <label class="btn" for="fileIn">Open .ls…</label>
       <input type="file" id="fileIn" multiple hidden>
+      <button class="btn helpbtn" id="helpBtn" type="button" aria-label="Help" title="Help (?)">?</button>
     </div>
   </header>
 
@@ -67,7 +68,7 @@
           <button class="btn play" id="recNew" type="button">Record new point</button>
           <button class="btn" id="recTouch" type="button" disabled>Touch up</button>
         </div>
-        <p class="hint" id="jogHint">Drag the yellow handle at the tool tip, or use the jog buttons. Click a program line to choose where a new point goes.</p>
+        <div class="jrow jhint"><button class="btn helpbtn" type="button" data-help="help-teach" aria-label="How teach mode works" title="How teach mode works">?</button><p class="hint" id="jogHint">Drag the yellow handle at the tool tip, or use the jog buttons. Click a program line to choose where a new point goes.</p></div>
       </div>
     </section>
 
@@ -155,6 +156,63 @@
     </section>
   </div>
 </div>
+
+<dialog id="helpDlg" aria-labelledby="helpTitle">
+  <div class="help-h"><h2 id="helpTitle">How to use this</h2><button class="btn" type="button" id="helpClose" aria-label="Close help">Close</button></div>
+  <div class="help-b">
+    <nav class="help-toc" aria-label="Help topics"><a href="#help-start">Start</a><a href="#help-teach">Teach a point</a><a href="#help-data">Registers</a><a href="#help-prog">Program features</a><a href="#help-view">3D view</a><a href="#help-keys">Shortcuts</a></nav>
+
+    <section id="help-start"><h3>Start</h3><ol>
+      <li>Pick a program tab, load one from <b>Examples…</b>, press <b>New</b> for a blank program, or <b>Open .ls…</b> to load your own.</li>
+      <li>Press <b>▶ Play</b> to watch it run, or step one line at a time with <b>Line ▶</b> and <b>◀ Line</b>. Drag the slider to scrub.</li>
+      <li>Click any line in the editor to jump to where it runs.</li>
+      <li>Check <b>Findings</b> for problems; click one to go to its line.</li>
+    </ol></section>
+
+    <section id="help-teach"><h3>Teach a point (drag the tool head)</h3><ol>
+      <li>In the editor, click the line you want the new move to go <b>after</b>.</li>
+      <li>Press <b>Teach</b> (under the 3D view). Playback stops and the arm is yours to move.</li>
+      <li>Drag the <b>yellow ball</b> at the tool tip. A plain drag moves it across X/Y; hold <kbd>Shift</kbd>, or choose <b>Drag Z</b>, to move it up and down.<br>
+        Or jog it: choose <b>Joint</b>, <b>World</b>, <b>User</b> or <b>Tool</b>, pick a <b>Step</b>, and press the <b>−</b> / <b>+</b> buttons.</li>
+      <li>Choose <b>L linear</b> or <b>J joint</b> and press <b>Record new point</b>. That adds a new <code>P[n]</code> and a move line after the line you clicked.</li>
+      <li>To fix an existing point instead: click its line, move the arm, and press <b>Touch up</b>. On a <code>PR[ ]</code> line this sets the register's start value in <b>Position Reg</b>.</li>
+      <li>Press <b>Teach</b> again to go back to playback.</li>
+    </ol>
+    <p>New points use the user and tool frame active at the clicked line (shown next to the Record button).</p></section>
+
+    <section id="help-data"><h3>Registers and position registers</h3><ul>
+      <li><b>Data panel</b> (below the editor): set each <code>R[ ]</code> and <code>PR[ ]</code> once, with a comment. Every program starts from these values, like the pendant's DATA screens.</li>
+      <li><b>After run</b> shows what the last run left behind. <b>Keep after-run values</b> copies them into the start values.</li>
+      <li>Highlighted rows are used by the open program; a • means it reads that register before setting it.</li>
+      <li>Or set them in the program: <code>R[1]=0</code>, <code>PR[1]=P[2]</code>, <code>PR[1,3]=50</code>, <code>PR[2]=LPOS</code>.</li>
+      <li>The <b>Registers &amp; I/O</b> panel shows values at the current line. Flip inputs like <code>DI[1]</code> there, or make one switch after a few seconds.</li>
+    </ul></section>
+
+    <section id="help-prog"><h3>Program features</h3><ul>
+      <li><code>CALL PROG</code> runs another open program; <code>CALL PROG(60,R[2])</code> passes values it reads with <code>AR[1]</code>, <code>AR[2]</code>.</li>
+      <li>A macro line like <code>OPEN HAND</code> runs the program you pick for it under <b>Settings › Macros</b>.</li>
+      <li><code>IF …,JMP LBL[ ]</code>, <code>IF … THEN / ELSE / ENDIF</code>, <code>SELECT</code>, <code>FOR … ENDFOR</code>.</li>
+      <li><code>WAIT .50(sec)</code>, <code>WAIT DI[1]=ON</code>, and <code>WAIT … TIMEOUT,LBL[ ]</code> (timeout under <b>Settings</b>).</li>
+      <li><code>Offset,PR[ ]</code> on a move shifts it; <code>DO[1]=PULSE,0.5sec</code> turns an output on briefly.</li>
+      <li>Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> in the editor for instruction suggestions. Point data is on the <b>Positions</b> tab. <b>Download .ls</b> saves the file.</li>
+    </ul></section>
+
+    <section id="help-view"><h3>3D view</h3><ul>
+      <li>Drag empty space to spin the view; scroll or pinch to zoom; right-drag (two fingers on touch) to pan.</li>
+      <li>Path colors: <span class="sw" style="background:var(--mJ)"></span> J joint, <span class="sw" style="background:var(--mL)"></span> L linear, <span class="sw" style="background:var(--mC)"></span> C circular, <span class="sw" style="background:var(--mB)"></span> CNT blend.</li>
+      <li>The <b>Paper</b> view shows what the tool draws, seen from above.</li>
+    </ul></section>
+
+    <section id="help-keys"><h3>Shortcuts</h3><table class="help-keys">
+      <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+      <tr><td><kbd>Alt</kbd>+<kbd>→</kbd> / <kbd>Alt</kbd>+<kbd>←</kbd></td><td>Next / previous line</td></tr>
+      <tr><td><kbd>Shift</kbd> while dragging</td><td>Move the tool up and down</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Suggestions in the editor</td></tr>
+      <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+    </table>
+    <p>Programs stay in your browser; nothing is uploaded.</p></section>
+  </div>
+</dialog>
 
 <script src="vendor/three.min.js"></script>
 <script src="vendor/OrbitControls.js"></script>
