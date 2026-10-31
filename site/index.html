@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Write, simulate and visualize teach-pendant .ls robot programs in the browser.">
 <title>Pendant Path Viewer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%23e0a800'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -119,6 +120,7 @@
         <div class="field" id="ufFields"></div>
         <div class="field" id="prFields"></div>
         <div class="field" id="rFields"></div>
+        <div class="field" id="macroFields"></div>
         <div class="field">
           <label for="comp">Pen spring travel</label>
           <div class="row"><input type="range" id="comp" min="0" max="15" step="0.5" value="3"><input class="num" id="compN" type="number" min="0" max="30" step="0.5" value="3"> mm</div>
@@ -128,6 +130,11 @@
           <label for="maxTime">Simulate up to</label>
           <div class="row"><input type="range" id="maxTime" min="10" max="600" step="10" value="120"><input class="num" id="maxTimeN" type="number" min="5" max="3600" step="5" value="120"> s</div>
           <p class="hint">Programs that loop forever are cut off here.</p>
+        </div>
+        <div class="field">
+          <label for="waitTo">WAIT timeout</label>
+          <div class="row"><input type="range" id="waitTo" min="1" max="120" step="1" value="30"><input class="num" id="waitToN" type="number" min="0.1" max="3600" step="0.5" value="30"> s</div>
+          <p class="hint">How long WAIT … TIMEOUT,LBL[ ] waits before jumping. The real value is a controller setting.</p>
         </div>
         <p class="note">Simulated, not certified. The arm is a generic small 6-axis model (330 mm upper arm, 335 mm forearm) in a front / elbow-up configuration. CNT rounding, acceleration and logic timing are approximations, so cycle times and corner shapes are estimates; use the robot maker’s simulator or the real pendant for exact behavior.</p>
       </div>

@@ -22,15 +22,17 @@ It works with the `.ls` export format used by FANUC controllers. This project is
   - Conditionals: `IF cond,JMP/CALL` with `AND`/`OR`, `IF (…) THEN / ELSE / ENDIF`, and `SELECT R[ ]=…` with `=n,` and `ELSE,` branches.
   - `FOR … TO/DOWNTO … ENDFOR`.
   - Waits: `WAIT n(sec)`, `WAIT cond` and `WAIT … TIMEOUT,LBL[ ]`.
-  - Outputs: `DO/RO/GO/F[ ]=` and `PULSE`.
-  - Program control: `CALL` to other open programs, `END`, `ABORT`.
+  - Waits: the `TIMEOUT` time is set under **Settings › WAIT timeout** (30 s to start).
+  - Outputs: `DO/RO/GO/F[ ]=` and `PULSE` (the output stays on for the pulse time while the program carries on).
+  - Program control: `CALL` to other open programs, with arguments (`CALL PICK(60,R[2],'A')`, read with `AR[n]`), `END`, `ABORT`.
+  - Macros: a line that is just a macro name (`OPEN HAND`, `GRIP_CLOSE(2)`) runs the program you pick for it under **Settings › Macros**, standing in for the controller's macro table. A loaded program with the same name runs too, with a note.
   - Frames: `UFRAME_NUM`, `UTOOL_NUM`, and `UFRAME[i]=PR[ ]`.
   - `OVERRIDE`.
 - **Motion:** simulates `J`, `L` and `C` moves.
   - `FINE` / `CNTn` corner rounding (including `CNT R[ ]`) and register speeds (`R[ ]mm/sec`).
   - `Offset,PR[ ]`, `Tool_Offset,PR[ ]` and `OFFSET CONDITION`.
   - User and tool frames.
-- **Registers & I/O panel:** shows register, position register and output values at the current line; changed values are highlighted.
+- **Registers & I/O panel:** shows register, position register and output values at the current line; changed values are highlighted. Inside a called program it also shows the `AR[ ]` arguments it was given.
 - **Inputs:** you set `DI/RI/GI` values here, and can make an input flip after a few seconds so `WAIT DI[ ]=ON` releases.
 - **Stepping:** **◀ Line / Line ▶** steps one executed line at a time, through loops and calls. Clicking a line in the editor jumps to where it runs.
 - **Teach mode:** press **Teach** to take the arm off playback and position it yourself, then record what you've set up.
@@ -50,6 +52,8 @@ It works with the `.ls` export format used by FANUC controllers. This project is
   Logic:
   - jumps to missing labels
   - `CALL` to a program that isn't loaded
+  - `AR[n]` read when the `CALL` didn't pass that many arguments
+  - macro lines with no program set up
   - waits that would never end
   - endless loops
   - registers read before they're set
@@ -69,6 +73,7 @@ Pick one from **Examples…** on the page. The files are in [`site/examples/`](s
 | `loop_squares.ls` | `LBL` / `JMP` / `IF` with a counter and a stacked `Offset,PR[ ]` |
 | `main_select.ls` + `a_square.ls`, `a_triangle.ls` | `SELECT` on a group input and `CALL` to subprograms; change `GI[1]` in the I/O panel |
 | `pick_place.ls` | Building a user frame in the program, `FOR` loop, `WAIT DI[ ]`, gripper `RO[ ]`, place offsets |
+| `stack_parts.ls` + `pick_part.ls`, `grip_open.ls`, `grip_close.ls` | `CALL` with an argument, `OPEN HAND` / `CLOSE HAND` macros, an `IF` loop, `WAIT … TIMEOUT`, a stacking `Offset,PR[ ]` and `PULSE` |
 
 ## Limits
 
@@ -77,8 +82,8 @@ This is a study aid, not a certified simulator.
 - **Arm model:** a generic small 6-axis arm (330 mm upper arm, 335 mm forearm), front / elbow-up configuration only.
 - **Approximate timing:** CNT blending, acceleration and logic timing are approximations, so corner shapes and cycle times are estimates.
 - **Values the `.ls` file doesn't hold:** registers, PRs, frames and inputs live on the controller. Enter them on the page.
-- **Not simulated:** system variables, `TIMER`, `PAYLOAD`, `MESSAGE`, `SKIP`, `INC`, arguments to `CALL` (`AR[ ]` reads as 0), background logic and multiple motion groups. These are skipped and noted in Findings where it matters.
-- **WAIT timeouts:** a `WAIT … TIMEOUT,LBL[ ]` times out after 30 s, standing in for `$WAITTMOUT`.
+- **Not simulated:** system variables, `TIMER`, `PAYLOAD`, `MESSAGE`, `SKIP`, `INC`, string registers (`SR[ ]`), background logic and multiple motion groups. These are skipped and noted in Findings where it matters.
+- **WAIT timeouts:** a `WAIT … TIMEOUT,LBL[ ]` times out after the Settings value (30 s to start), standing in for the controller's setting.
 - **Exported `.ls` files are not yet verified on a controller.** Loading an `.ls` file on a controller needs the ASCII program loader option.
 
 ## Running locally
@@ -98,7 +103,7 @@ Then open http://localhost:8000. Opening `index.html` directly from disk won't l
 node tests/core.test.js
 ```
 
-The tests run the interpreter against the example programs and a set of edge cases.
+The tests run the interpreter against the example programs and a set of edge cases. GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs both test scripts on every pull request and push to `main`.
 
 `node tests/browser-smoke.js` loads the real page in headless Chromium at desktop and phone width; it needs Playwright. See [`CLAUDE.md`](CLAUDE.md) for contributor notes and [`docs/`](docs/) for architecture and the backlog.
 

@@ -1,0 +1,24 @@
+/PROG  GRIP_CLOSE	Macro
+/ATTR
+OWNER		= MNEDITOR;
+COMMENT		= "macro: close gripper";
+PROG_SIZE	= 0;
+FILE_NAME	= ;
+VERSION		= 0;
+LINE_COUNT	= 2;
+MEMORY_SIZE	= 0;
+PROTECT		= READ_WRITE;
+TCD:  STACK_SIZE	= 0,
+      TASK_PRIORITY	= 50,
+      TIME_SLICE	= 0,
+      BUSY_LAMP_OFF	= 0,
+      ABORT_REQUEST	= 0,
+      PAUSE_REQUEST	= 0;
+DEFAULT_GROUP	= *,*,*,*,*;
+CONTROL_CODE	= 00000000 00000000;
+/APPL
+/MN
+   1:  RO[1:gripper open]=OFF ;
+   2:  WAIT .30(sec) ;
+/POS
+/END

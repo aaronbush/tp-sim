@@ -35,7 +35,9 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 
 ### Parser
 
-- **Instruction types.** `parseLine` / `classify` assign each line one of these types: `empty comment remark lbl jmp call end abort pause if ifthen else endif select selcase selelse for endfor waitt waitc offcond toffcond override ufnum utnum setuf setut assign motion ignored unknown error`.
+- **Instruction types.** `parseLine` / `classify` assign each line one of these types: `empty comment remark lbl jmp call end abort pause if ifthen else endif select selcase selelse for endfor waitt waitc offcond toffcond override ufnum utnum setuf setut assign motion macro ignored unknown error`.
+- **Macros.** A line that is only a name, optionally with `(args)`, is a `macro`. `ins.name` is `macroKey(text)`: upper case with single spaces, so `Open hand 1` becomes `OPEN HAND 1`. It is tried after everything else, so a misspelled instruction also lands here and gets the "isn't set up" finding.
+- **Arguments.** `parseArgs` turns `(1,R[2],'A')` on a `CALL`, an `IF …,CALL` action or a macro into a list of parsed expressions. Quoted text lexes as a `str` token, which can only be compared with `=` / `<>`.
 - **Expressions.** These go through `lex` and `parseExpr`, a recursive-descent parser with precedence `OR < AND < NOT < compare < +,- < *,/,DIV,MOD < unary`. The returned `flags` record whether `+/-` was mixed with `*,/` and `AND` with `OR` at the top level, without parentheses. The real pendant forbids both, so the interpreter warns.
 - **Register references.** `lexRef` handles `KIND[idx(,elem)(:comment)]`. The index can be indirect (`R[R[1]]`, `PR[R[2]]`). Comments may contain spaces.
 - **Motion lines.** `parseMotion` reads the target (`P` or `PR`, a via point for `C`), speed (`%`, `mm/sec`, `cm/min`, `inch/min`, `deg/sec`, `sec`, `max_speed`, or a register `R[n]`), termination (`FINE`, `CNTn` or `CNT R[n]`), and options. `Offset` and `Tool_Offset` (with or without a PR) are simulated; `ACC`, `TB`/`TA`, `Skip`, `INC` and similar are collected in `opts.ignored`.
@@ -44,11 +46,13 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 ### Interpreter — `simulate()`
 
 - **Machine state `S`.** It holds `R{}` (registers), `PR{}` (`{type:'cart'|'joint', v[6], assumed?}`), `out{}` (outputs keyed like `'RO[1]'`), the active `uf`/`ut`, `override`, offset conditions, and the runtime `uframes{}`/`tools{}` (seeded from settings; `UFRAME[i]=PR[j]` changes them).
-- **Call stack.** Frames are `{prog, pc, callLine}`. `stack[0].callLine` is the root-program line that made the current call, which lets the editor highlight the CALL line while a subprogram runs.
+- **Call stack.** Frames are `{prog, pc, callLine, args}`. `args` holds the evaluated arguments, read by `AR[n]`; reading past the end stops with an error, as the controller alarms. `stack[0].callLine` is the root-program line that made the current call, which lets the editor highlight the CALL line while a subprogram runs.
 - **Execution loop.** One instruction per iteration. Each executed line pushes a **step** onto `steps`: `{prog, line, kind:'logic'|'move'|'wait', t, snap, seg, rootLine, cond?, dur?}`.
-- **Snapshots.** Any state change calls `changed()`, which pushes a copy of `R/PR/out/uf/ut/override` onto `snaps`. Each step stores `snap`, the index of the snapshot current when it ran.
+- **Snapshots.** Any state change calls `changed()`, which pushes a copy of `R/PR/out/uf/ut/override` and `ar` (the current frame's arguments) onto `snaps`. Entering and leaving a program also takes a snapshot.
+- **Macros.** A `macro` line runs `settings.macros[name]` like a CALL. With no entry, a loaded program of that name runs (info finding); otherwise the line is skipped (info finding).
+- **PULSE.** `DO[n]=PULSE,t` turns the output on and records `{key, until}` in `pulses`. `expirePulses()` runs before each line and switches expired ones off, and `WAIT` treats a pulse end as a time when a condition can change. `sim.pulses` lists `{key, t0, t1}` for every pulse so the panel can show an output going off in the middle of a move. Each step stores `snap`, the index of the snapshot current when it ran.
 - **Moves.** `poseFor()` resolves the target into world coordinates. It applies the point's user frame (P) or the active user frame (Cartesian PR), then `Offset`, then `Tool_Offset`. It flags a mismatch between a P's UF/UT and the active `UFRAME_NUM`/`UTOOL_NUM`. `buildMotion()` then produces a segment with samples and a duration.
-- **WAIT.** A wait becomes a dwell segment (`mt:'W'`). `WAIT cond` advances time to the next scheduled input change (`settings.inputs[key].at`) until the condition is true. It times out after 30 s when `TIMEOUT,LBL` is given; otherwise it stops with "Waits forever".
+- **WAIT.** A wait becomes a dwell segment (`mt:'W'`). `WAIT cond` advances time to the next scheduled input change (`settings.inputs[key].at`) until the condition is true. It times out after `settings.waitTimeout` seconds (30 when unset) when `TIMEOUT,LBL` is given; otherwise it stops with "Waits forever".
 - **Limits.** Execution stops at 20,000 steps, 3,000 moves, or `settings.maxTime` seconds, and reports why in `stopReason`: `end abort error wait steps time moves`.
 - **Unset values.** A PR with no value that is used as a motion target defaults to home joints (`assumed:true`). Reading an unset `R[]` gives 0 plus an info finding.
 
@@ -83,11 +87,11 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 
   ```js
   { tools: {n: [6]}, uframes: {n: [6]}, pr: {n: {type:'joint'|'cart', v:[6]}}, r: {n: number},
-    inputs: {'DI[1]': {v, at?, to?}}, comp, tol, maxTime }
+    inputs: {'DI[1]': {v, at?, to?}}, macros: {'OPEN HAND': 'GRIP_OPEN'}, comp, tol, maxTime, waitTimeout }
   ```
 
   `settingsForRun()` adds `start`, the home joints taken from the first PR the root program moves to.
-- **Which program runs.** The active tab is the root program. Every open program can be the target of a CALL. `reachableFrom()` limits the settings panels and the Registers & I/O panel to programs the root actually calls.
+- **Which program runs.** The active tab is the root program. Every open program can be the target of a CALL or a macro. `reachableFrom()` (following macros through `macroTarget()`) limits the settings panels and the Registers & I/O panel to programs the root actually calls.
 - **Settings panels.** They only ask for starting values the program doesn't set itself (`refs.prNeed`, `refs.rNeed`), and are rebuilt only when that set changes, so typing in settings doesn't lose focus.
 - **Playback.**
   - `t` is the time; `sampleAt(t)` gives the timeline sample.
@@ -116,5 +120,6 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 
 - **`also`:** extra programs to load alongside the main one.
 - **`inputs`:** preset input values, applied only if the user hasn't set that input yet.
+- **`macros`:** preset macro table entries (`{"OPEN HAND": "GRIP_OPEN"}`), applied the same way.
 - **First visit:** all examples are loaded when there is no saved workspace.
 - **Adding an example:** add an interpreter test for it in `tests/core.test.js`.

@@ -78,6 +78,44 @@ const lines = (sim) => sim.steps.map(s => `${s.prog}:${s.line}`);
   const bad = c.parseLine('R[1]=R[2]+', 1);
   check('parse error reported', bad.type === 'error', bad.error); }
 
+// stack parts: CALL with an argument, macros, IF loop, WAIT, Offset PR, PULSE
+{ const progs = ['stack_parts.ls', 'pick_part.ls', 'grip_open.ls', 'grip_close.ls'].map(load);
+  const macros = { 'OPEN HAND': 'GRIP_OPEN', 'CLOSE HAND': 'GRIP_CLOSE' };
+  const s = run('STACK_PARTS', progs, { inputs: { 'DI[1]': { v: 1 } }, macros });
+  const places = s.segs.filter(g => g.prog === 'STACK_PARTS' && g.line === 13).map(g => g.to.p[2].toFixed(0));
+  check('stack places 3 parts 20 mm apart', places.join() === '-250,-230,-210', places.join());
+  const above = s.segs.find(g => g.prog === 'PICK_PART' && g.line === 4);
+  check('AR[1] sets the approach height', above && Math.abs(above.to.p[2] - -190) < 1e-6);
+  check('macros run their programs', s.segs.filter(g => g.prog === 'GRIP_CLOSE').length === 3 && s.segs.filter(g => g.prog === 'GRIP_OPEN').length === 4);
+  check('stack has no findings', s.issues.length === 0, s.issues.map(i => i.title).join(' | '));
+  check('PULSE lasts 0.5 s', s.pulses.length === 3 && s.pulses.every(p => Math.abs(p.t1 - p.t0 - 0.5) < 1e-9));
+  const s2 = run('STACK_PARTS', progs, { inputs: { 'DI[1]': { v: 1 } } });
+  check('unmapped macro is flagged and skipped', s2.issues.some(i => /OPEN HAND.*isn't set up/.test(i.title)) && !s2.segs.some(g => g.prog === 'GRIP_OPEN'));
+  const s3 = run('STACK_PARTS', progs, { inputs: { 'DI[1]': { v: 0 } }, macros, waitTimeout: 5 });
+  const w = s3.steps.find(x => x.kind === 'wait' && x.line === 10);
+  check('WAIT timeout uses the setting', w && w.dur === 5 && s3.issues.some(i => /5 s timeout/.test(i.detail))); }
+
+// CALL arguments, macros by program name, PULSE timing
+{ const mk = (name, ls) => c.makeProgram(name, '', ls, '');
+  const sub = mk('ADDER', ['R[1]=AR[1]+AR[2]', 'IF AR[3]=\'hi\',JMP LBL[1]', 'R[2]=1', 'LBL[1]']);
+  const s = run('T', [mk('T', ['R[5]=4', 'CALL ADDER(R[5],2.5,\'hi\')']), sub]);
+  const R = s.snaps[s.snaps.length - 1].R;
+  check('CALL passes numbers and registers', R[1] === 6.5);
+  check('text argument compares with =', R[2] === undefined);
+  check('AR values are in the snapshot while inside', s.snaps.some(x => x.ar && x.ar[2] === 'hi'));
+  const s2 = run('T', [mk('T', ['CALL ADDER(1)']), sub]);
+  check('missing AR is an error', s2.stopReason === 'error' && s2.issues.some(i => /AR\[2\] wasn't passed/.test(i.detail)));
+  const s3 = run('T', [mk('T', ['IF R[9]=0,CALL ADDER(1,2,3)']), sub]);
+  check('IF ...,CALL passes arguments', s3.snaps[s3.snaps.length - 1].R[1] === 3);
+  const s4 = run('T', [mk('T', ['MYMAC']), mk('MYMAC', ['R[3]=7'])]);
+  check('macro with a program of the same name runs it', s4.snaps[s4.snaps.length - 1].R[3] === 7 && s4.issues.some(i => /as a macro/.test(i.title)));
+  check('macro line with spaces parses', c.parseLine('Open hand 1', 1).type === 'macro' && c.parseLine('Open hand 1', 1).name === 'OPEN HAND 1');
+  const s5 = run('T', [mk('T', ['DO[1]=PULSE,1.0sec', 'WAIT DO[1]=OFF', 'R[1]=1'])]);
+  const w = s5.steps.find(x => x.kind === 'wait');
+  check('PULSE output switches off after its time', s5.stopReason === 'end' && w && Math.abs(w.dur - 1) < 1e-9);
+  const s6 = run('T', [mk('T', ['DO[1]=PULSE,1.0sec', 'WAIT 2.00(sec)', 'R[1]=DO[1]'])]);
+  check('pulse is off after the wait', s6.snaps[s6.snaps.length - 1].R[1] === 0 && s6.snaps.some(x => x.out['DO[1]'] === 1)); }
+
 // .ls round trip
 { const p = load('main_select.ls'); const p2 = c.parseLS(c.toLS(p));
   check('.ls round trip keeps lines', JSON.stringify(p.lines) === JSON.stringify(p2.lines)); }

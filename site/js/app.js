@@ -13,7 +13,7 @@ const store = {
 
 // ---------- settings ----------
 const settings = (() => {
-  const s = { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, comp: 3, tol: 1, maxTime: 120, ...store.get('settings2', {}) };
+  const s = { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, macros: {}, comp: 3, tol: 1, maxTime: 120, waitTimeout: 30, ...store.get('settings2', {}) };
   // migrate v1 settings (tool length + joint-only PRs)
   const oldTool = store.get('tool', null); if (oldTool != null && !store.get('settings2', null)) s.tools[1] = [0, 0, +oldTool, 0, 0, 0];
   const oldPr = store.get('pr', null); if (oldPr && !store.get('settings2', null)) for (const k in oldPr) if (Array.isArray(oldPr[k])) s.pr[k] = { type: 'joint', v: oldPr[k] };
@@ -89,6 +89,7 @@ async function loadExample(ix, select) {
   const files = [ex.file, ...(ex.also || [])];
   const texts = await Promise.all(files.map(f => fetch('examples/' + f).then(r => r.text())));
   for (const k in ex.inputs || {}) if (!settings.inputs[k]) settings.inputs[k] = { ...ex.inputs[k] };
+  for (const k in ex.macros || {}) if (!settings.macros[k]) settings.macros[k] = ex.macros[k];
   saveSettings();
   texts.forEach((tx, i) => { const en = entryFromText(tx); addEntry(en, false); if (i === 0 && select) selectProgram(programs.findIndex(p => p.name === en.name)); });
 }
@@ -146,7 +147,7 @@ function selectProgram(i) {
 }
 
 // ---------- simulation ----------
-let lastRefsKey = '', comments = {};
+let lastRefsKey = '', comments = {}, lastPulseEdges = 0;
 function settingsForRun(root) {
   const firstPR = root.ins.find(x => x.type === 'motion' && x.tgt.kind === 'PR' && typeof x.tgt.idx === 'number');
   const pr = firstPR && settings.pr[firstPR.tgt.idx];
@@ -171,7 +172,7 @@ function rerun(keepTime, frac) {
   // only ask for starting values the program doesn't set itself
   refs.prNeed = new Set([...refs.PR].filter(n => !reach.some(p => p.ins.some(x => x.type === 'assign' && x.lhs.kind === 'PR' && x.lhs.elem == null && x.lhs.idx === n))));
   refs.rNeed = new Set([...refs.R].filter(n => !reach.some(p => p.ins.some(x => (x.type === 'assign' && x.lhs.kind === 'R' && x.lhs.idx === n) || (x.type === 'for' && x.reg.idx === n)))));
-  const key = JSON.stringify({ R: [...refs.rNeed], PR: [...refs.prNeed], UF: [...refs.UF], UT: [...refs.UT], I: [...refs.inputs], O: [...refs.outputs] });
+  const key = JSON.stringify({ R: [...refs.rNeed], PR: [...refs.prNeed], UF: [...refs.UF], UT: [...refs.UT], I: [...refs.inputs], O: [...refs.outputs], M: [...refs.macros], P: programs.map(p => p.name) });
   sim.refs = refs;
   if (key !== lastRefsKey) { lastRefsKey = key; renderSettings(refs); }
   renderIssues(); buildScene(); paperDirty = true;
@@ -179,11 +180,13 @@ function rerun(keepTime, frac) {
   edProg.setCounts(sim.lineCounts, true);
   $('progMeta').textContent = `${root.name}${root.comment ? ' · "' + root.comment + '"' : ''}`;
 }
+// program a macro line runs: the macro table, else a loaded program with the same name
+const macroTarget = (name, by) => settings.macros[name] || (by[name] ? name : null);
 function reachableFrom(root, progs) {
   const by = {}; progs.forEach(p => by[p.name] = p);
   const out = [root], seen = new Set([root.name]);
   for (let k = 0; k < out.length; k++) for (const x of out[k].ins) {
-    const name = x.type === 'call' ? x.prog : x.action && x.action.act === 'call' ? x.action.prog : null;
+    const name = x.type === 'call' ? x.prog : x.type === 'macro' ? macroTarget(x.name, by) : x.action && x.action.act === 'call' ? x.action.prog : null;
     if (name && by[name] && !seen.has(name)) { seen.add(name); out.push(by[name]); }
   }
   return out;
@@ -273,6 +276,10 @@ function renderSettings(refs) {
       return `<div class="v6" style="margin-top:6px"><span class="lab">PR[${n}]${comments['PR[' + n + ']'] ? ' ' + esc(comments['PR[' + n + ']']) : ''}</span>${heads.map(h => `<span class="h">${h}</span>`).join('')}
         <select id="prt${n}" data-prt="${n}" aria-label="PR ${n} type"><option value="joint"${pr.type === 'joint' ? ' selected' : ''}>Joint</option><option value="cart"${pr.type === 'cart' ? ' selected' : ''}>XYZWPR</option></select>
         ${pr.v.map((v, j) => `<input class="num" type="number" step="0.1" id="pr${n}_${j}" data-pr="${n}" data-j="${j}" value="${+(+v).toFixed(3)}" aria-label="PR ${n} ${heads[j]}">`).join('')}</div>`; }).join('')}` : '';
+  const ms = [...refs.macros].sort();
+  $('macroFields').innerHTML = ms.length ? `<span class="fl">Macros</span><p class="hint">Which program each macro line runs. On the pendant this is the macro table (MENU › SETUP › Macro). Load the macro programs first (Open .ls…).</p>
+    <div class="mgrid">${ms.map((n, k) => { const cur = settings.macros[n] || ''; const names = programs.map(p => p.name.toUpperCase());
+      return `<label for="mac${k}">${esc(n)}</label><select id="mac${k}" data-mac="${esc(n)}"><option value="">${names.includes(n) ? 'same-named program' : 'not set (skipped)'}</option>${names.map(p => `<option${p === cur ? ' selected' : ''}>${esc(p)}</option>`).join('')}${cur && !names.includes(cur) ? `<option selected value="${esc(cur)}">${esc(cur)} (not loaded)</option>` : ''}</select>`; }).join('')}</div>` : '';
   const rs = [...refs.rNeed].sort((a, b) => a - b);
   $('rFields').innerHTML = rs.length ? `<span class="fl">Registers (starting values)</span><p class="hint">What each R[ ] holds when the program starts. Leave blank for 0.</p>
     <div class="rgrid">${rs.map(n => `<label for="r${n}">R[${n}]<input class="num" type="number" step="any" id="r${n}" data-r="${n}" value="${settings.r[n] ?? ''}" placeholder="0"></label>`).join('')}</div>` : '';
@@ -291,6 +298,7 @@ $('settings').addEventListener('change', e => {
     settings.pr[n] = { type: el.value, v: v.map(x => +x.toFixed(3)) }; renderSettings(sim.refs);
   }
   else if (d.pr) { const n = d.pr, cur = settings.pr[n] || { type: 'joint', v: HOME.slice() }; const v = cur.v.slice(); v[+d.j] = parseFloat(el.value) || 0; settings.pr[n] = { type: cur.type, v }; }
+  else if (d.mac != null) { if (el.value) settings.macros[d.mac] = el.value; else delete settings.macros[d.mac]; }
   else if (d.r) { if (el.value === '') delete settings.r[d.r]; else settings.r[d.r] = parseFloat(el.value) || 0; }
   else return;
   saveSettings(); rerun(true);
@@ -305,6 +313,7 @@ function bindPair(rangeId, numId, key) {
 }
 bindPair('comp', 'compN', 'comp');
 bindPair('maxTime', 'maxTimeN', 'maxTime');
+bindPair('waitTo', 'waitToN', 'waitTimeout');
 
 // ---------- registers & I/O panel ----------
 function inputNow(key) {
@@ -323,13 +332,16 @@ function renderState(si) {
   const rs = [...refs.R].sort((a, b) => a - b), prs = [...refs.PR].sort((a, b) => a - b);
   const outs = [...refs.outputs].sort(), ins = [...refs.inputs].sort();
   let html = '';
+  if (snap.ar && snap.ar.length) html += `<div class="sgroup"><h3>Arguments <span style="text-transform:none;letter-spacing:0;font-weight:400">(passed to ${esc(sp ? sp.prog : '')})</span></h3><table class="regs">${snap.ar.map((v, j) => `<tr><td>AR[${j + 1}]</td><td class="c"></td><td class="v">${typeof v === 'string' ? "'" + esc(v) + "'" : fmtV(v)}</td></tr>`).join('')}</table></div>`;
   if (rs.length) html += `<div class="sgroup"><h3>Registers</h3><table class="regs">${rs.map(n => { const v = snap.R[n], pv = prev ? prev.R[n] : undefined; const chg = prev && v !== pv;
     return `<tr class="${chg ? 'chg' : ''}"><td>R[${n}]</td><td class="c">${esc(comments['R[' + n + ']'] || '')}</td><td class="v">${v === undefined ? '<span class="empty-s">—</span>' : fmtV(v)}</td></tr>`; }).join('')}</table></div>`;
   if (prs.length) html += `<div class="sgroup"><h3>Position registers</h3><table class="regs">${prs.map(n => { const pr = snap.PR[n], ppr = prev ? prev.PR[n] : undefined; const chg = prev && JSON.stringify(pr) !== JSON.stringify(ppr);
     const heads = pr && pr.type === 'joint' ? J6H : V6H;
     const val = pr ? `<div class="prv">${pr.v.map((x, j) => `<span><span class="empty-s">${heads[j]}</span> ${fmt(x)}</span>`).join('')}</div>` : '<span class="empty-s">not set</span>';
     return `<tr class="${chg ? 'chg' : ''}"><td>PR[${n}]</td><td class="c">${esc(comments['PR[' + n + ']'] || '')}${pr && pr.assumed ? ' (default home)' : ''}</td><td class="v">${val}</td></tr>`; }).join('')}</table></div>`;
-  if (outs.length) html += `<div class="sgroup"><h3>Outputs</h3><div class="chips">${outs.map(k => { const v = snap.out[k] ?? 0; const isNum = /^(GO|AO)/.test(k);
+  // a pulse that ended during this step (e.g. mid-move) shows as off once playback passes its end
+  const pulseOff = k => sp && sim.pulses.some(p => p.key === k && p.t1 > sp.t + 1e-9 && p.t1 <= t + 1e-9);
+  if (outs.length) html += `<div class="sgroup"><h3>Outputs</h3><div class="chips">${outs.map(k => { const v = pulseOff(k) ? 0 : snap.out[k] ?? 0; const isNum = /^(GO|AO)/.test(k);
     return `<span class="chip-io ${!isNum && v ? 'on' : ''}">${isNum ? '' : '<i></i>'}${k}${isNum ? ' = ' + fmtV(v) : ''}${comments[k] ? ` <span class="c">${esc(comments[k])}</span>` : ''}</span>`; }).join('')}</div></div>`;
   if (ins.length) html += `<div class="sgroup"><h3>Inputs <span style="text-transform:none;letter-spacing:0;font-weight:400">(you set these)</span></h3><div class="inputs">${ins.map(k => { const d = settings.inputs[k] || { v: 0 }; const isNum = /^(GI|AI)/.test(k); const now = inputNow(k);
     const ctl = isNum ? `<input class="num" type="number" step="1" data-in="${k}" data-f="v" value="${+d.v || 0}" aria-label="${k} value">` : `<button type="button" class="toggle" data-in="${k}" data-f="tog" aria-pressed="${+d.v ? 'true' : 'false'}">${+d.v ? 'ON' : 'OFF'}</button>`;
@@ -600,8 +612,9 @@ function frame(now) {
     if (paperDirty) { drawPaper(i, f); paperDirty = false; }
     const si = currentStep();
     renderReadout(si, q, p, fkr);
-    if (si !== lastStepShown) {
-      lastStepShown = si;
+    const pe = sim.pulses.reduce((n, p) => n + (p.t1 <= t ? 1 : 0), 0);
+    if (si !== lastStepShown || pe !== lastPulseEdges) {
+      lastStepShown = si; lastPulseEdges = pe;
       const sp = sim.steps[si];
       if (sp) { const own = sp.prog === sim.activeName; edProg.setExecLine(own ? sp.line : sp.rootLine, !own, playing || pinned >= 0); }
       else edProg.setExecLine(0);

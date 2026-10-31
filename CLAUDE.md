@@ -31,6 +31,7 @@ tests/core.test.js     # node, no deps: interpreter + kinematics + .ls round-tri
 tests/browser-smoke.js # Playwright smoke test of the real page (desktop light + 420px dark)
 tools/codemirror/      # entry.js + package.json to rebuild site/vendor/codemirror.min.js
 .github/workflows/pages.yml  # deploys site/ to Pages on push to main
+.github/workflows/ci.yml     # core tests + browser smoke test on every PR and push to main
 docs/                  # ARCHITECTURE.md, BACKLOG.md
 ```
 
