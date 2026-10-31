@@ -103,7 +103,7 @@ Then open http://localhost:8000. Opening `index.html` directly from disk won't l
 node tests/core.test.js
 ```
 
-The tests run the interpreter against the example programs and a set of edge cases.
+The tests run the interpreter against the example programs and a set of edge cases. GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs both test scripts on every pull request and push to `main`.
 
 `node tests/browser-smoke.js` loads the real page in headless Chromium at desktop and phone width; it needs Playwright. See [`CLAUDE.md`](CLAUDE.md) for contributor notes and [`docs/`](docs/) for architecture and the backlog.
 

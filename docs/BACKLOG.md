@@ -37,7 +37,6 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
 
 - **More teach-mode controls:** drag in User or Tool directions, not just World; a "move to point" button that jogs to the cursor line's P; and step-back/step-forward jogging.
 - **More examples that mirror course exercises:** the IF / DI polling loop (`MAIN1`-style) and a SELECT with a group input (`MAIN2`-style). Write them from scratch; don't copy the manual.
-- **CI:** a GitHub Actions job that runs `node tests/core.test.js`, and optionally the browser smoke test, on PRs.
 
 ## Housekeeping
 
