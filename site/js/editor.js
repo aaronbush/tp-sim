@@ -88,6 +88,8 @@ const TPEditor = (() => {
     S('WAIT DI[${1}]=${ON}', { label: 'WAIT DI[ ]=ON', type: 'keyword' }),
     S('WAIT DI[${1}]=ON TIMEOUT,LBL[${1}]', { label: 'WAIT ... TIMEOUT,LBL[ ]', type: 'keyword' }),
     S('CALL ${PROGRAM}', { label: 'CALL program', type: 'keyword' }),
+    S('CALL ${PROGRAM}(${1})', { label: 'CALL program(arguments)', type: 'keyword' }),
+    S('R[${1}]=AR[${1}]', { label: 'R[ ]=AR[ ] (read an argument)', type: 'variable' }),
     S('RO[${1}]=${ON}', { label: 'RO[ ]=ON/OFF (gripper)', type: 'variable' }),
     S('DO[${1}]=${ON}', { label: 'DO[ ]=ON/OFF', type: 'variable' }),
     S('DO[${1}]=PULSE,${0.5}sec', { label: 'DO[ ]=PULSE', type: 'variable' }),

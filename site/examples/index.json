@@ -29,6 +29,24 @@
           "v": 1
         }
       }
+    },
+    {
+      "file": "stack_parts.ls",
+      "title": "Stack: CALL / macro / IF / WAIT / offset",
+      "also": [
+        "pick_part.ls",
+        "grip_open.ls",
+        "grip_close.ls"
+      ],
+      "inputs": {
+        "DI[1]": {
+          "v": 1
+        }
+      },
+      "macros": {
+        "OPEN HAND": "GRIP_OPEN",
+        "CLOSE HAND": "GRIP_CLOSE"
+      }
     }
   ]
 }

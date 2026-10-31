@@ -227,6 +227,7 @@ function lex(s) {
     if ((m = rest.match(/^([A-Za-z]+)\[/)) && REF_KINDS.includes(m[1].toUpperCase())) {
       const r = lexRef(s, i); toks.push({ t: 'ref', ref: r.ref }); i = r.end; continue;
     }
+    if ((m = rest.match(/^(['"])(.*?)\1/))) { toks.push({ t: 'str', v: m[2] }); i += m[0].length; continue; }
     if ((m = rest.match(/^(\d+\.?\d*|\.\d+)/))) { toks.push({ t: 'num', v: parseFloat(m[1]) }); i += m[1].length; continue; }
     if ((m = rest.match(kw))) { toks.push({ t: 'kw', v: m[1].toUpperCase() }); i += m[1].length; continue; }
     if ((m = rest.match(/^(<=|>=|<>|=|<|>|\+|-|\*|\/|\(|\)|,|!)/))) { toks.push({ t: 'op', v: m[1] }); i += m[1].length; continue; }
@@ -274,6 +275,7 @@ function parseExpr(src) {
     const t = next();
     if (!t) throw new TPError('Expression ends too early');
     if (t.t === 'num') return { num: t.v };
+    if (t.t === 'str') return { str: t.v };
     if (t.t === 'ref') return { ref: t.ref };
     if (t.t === 'kw' && (t.v === 'ON' || t.v === 'OFF')) return { num: t.v === 'ON' ? 1 : 0 };
     if (t.t === 'kw' && (t.v === 'LPOS' || t.v === 'JPOS')) return { pos: t.v };
@@ -306,10 +308,28 @@ function lastTopComma(s) {
 const refText = r => r ? `${r.kind}[${typeof r.idx === 'object' ? refText(r.idx) : r.idx}${r.elem != null ? ',' + r.elem : ''}${r.cmt ? ':' + r.cmt : ''}]` : '';
 const refShort = r => r ? `${r.kind}[${typeof r.idx === 'object' ? refShort(r.idx) : r.idx}${r.elem != null ? ',' + r.elem : ''}]` : '';
 
+// Arguments of CALL PROG(1,R[2],'text') or a macro: numbers, registers, AR[ ] or quoted strings
+function parseArgs(paren) {
+  if (!paren) return [];
+  const body = paren.trim().replace(/^\(/, '').replace(/\)$/, '').trim();
+  if (!body) return [];
+  const out = []; let rest = body;
+  while (true) {
+    const c = splitTop(rest, ',');
+    const a = (c ? c[0] : rest).trim();
+    if (!a) throw new TPError('Empty argument in ( )');
+    const e = parseExpr(a); if (e.ast.pos) throw new TPError('Positions can’t be passed as arguments'); out.push(e);
+    if (!c) break; rest = c[1];
+  }
+  if (out.length > 10) throw new TPError('A CALL can pass at most 10 arguments');
+  return out;
+}
+const macroKey = s => s.trim().replace(/\s+/g, ' ').toUpperCase();
+
 function parseAction(s) {
   s = s.trim(); let m;
   if ((m = s.match(/^JMP\s+(LBL\[.*\])$/i))) return { act: 'jmp', lbl: lexRef(m[1], 0).ref };
-  if ((m = s.match(/^CALL\s+([A-Za-z0-9_]+)\s*(\(.*\))?$/i))) return { act: 'call', prog: m[1].toUpperCase() };
+  if ((m = s.match(/^CALL\s+([A-Za-z0-9_]+)\s*(\(.*\))?$/i))) return { act: 'call', prog: m[1].toUpperCase(), args: parseArgs(m[2]) };
   throw new TPError(`Unknown action "${s}" (expected JMP LBL[ ] or CALL program)`);
 }
 
@@ -329,7 +349,7 @@ function classify(ins, t) {
   if (/^[JLC]\s/i.test(t) && /^[JLC]\s+(P|PR)\[/i.test(t)) return parseMotion(ins, t);
   if ((m = t.match(/^LBL\[(\d+)(?::[^\]]*)?\]$/i))) { ins.type = 'lbl'; ins.lbl = +m[1]; return; }
   if ((m = t.match(/^JMP\s+(LBL\[.*\])$/i))) { ins.type = 'jmp'; ins.lbl = lexRef(m[1], 0).ref; return; }
-  if ((m = t.match(/^CALL\s+([A-Za-z0-9_]+)\s*(\(.*\))?$/i))) { ins.type = 'call'; ins.prog = m[1].toUpperCase(); return; }
+  if ((m = t.match(/^CALL\s+([A-Za-z0-9_]+)\s*(\(.*\))?$/i))) { ins.type = 'call'; ins.prog = m[1].toUpperCase(); ins.args = parseArgs(m[2]); return; }
   if (/^END$/i.test(t)) { ins.type = 'end'; return; }
   if (/^ABORT$/i.test(t)) { ins.type = 'abort'; return; }
   if (/^PAUSE$/i.test(t)) { ins.type = 'pause'; return; }
@@ -382,6 +402,8 @@ function classify(ins, t) {
     ins.rhs = parseExpr(rhs);
     return;
   }
+  // A macro is a line that is just a name from the macro table, e.g. "Open hand 1" or "GRIP_CLOSE(2)"
+  if ((m = t.match(/^([A-Za-z_][\w ]*?)\s*(\(.*\))?$/))) { ins.type = 'macro'; ins.name = macroKey(m[1]); ins.args = parseArgs(m[2]); return; }
   ins.type = 'unknown';
 }
 function parseMotion(ins, t) {
@@ -445,7 +467,7 @@ function analyzeStructure(prog) {
 }
 // Registers, positions and I/O a program refers to (for the settings panels)
 function collectRefs(progs) {
-  const out = { R: new Set(), PR: new Set(), inputs: new Set(), outputs: new Set(), UF: new Set([0]), UT: new Set([1]) };
+  const out = { R: new Set(), PR: new Set(), inputs: new Set(), outputs: new Set(), UF: new Set([0]), UT: new Set([1]), macros: new Set() };
   const visit = (node) => {
     if (!node || typeof node !== 'object') return;
     if (node.ref) addRef(node.ref);
@@ -465,6 +487,8 @@ function collectRefs(progs) {
     for (const ins of prog.ins) {
       for (const k of ['cond', 'value', 'from', 'to', 'time', 'expr', 'rhs']) if (ins[k]) visit(ins[k]);
       for (const k of ['tgt', 'via', 'reg', 'lhs', 'pr', 'lbl']) if (ins[k] && typeof ins[k] === 'object') addRef(ins[k]);
+      for (const a of ins.args || (ins.action && ins.action.args) || []) visit(a);
+      if (ins.type === 'macro') out.macros.add(ins.name);
       if (ins.speed && ins.speed.reg) addRef(ins.speed.reg);
       if (ins.term && ins.term.reg) addRef(ins.term.reg);
       if (ins.opts) for (const k of ['offset', 'toolOffset']) if (ins.opts[k] && typeof ins.opts[k] === 'object') addRef(ins.opts[k]);
@@ -563,7 +587,11 @@ function simulate(rootName, programs, st) {
   const toolOf = n => { const v = S.tools[n] || [0, 0, 0, 0, 0, 0]; return { p: [v[0], v[1], v[2]], R: wprToR(v[3], v[4], v[5]) }; };
   const ufOf = n => frameOf(n === 0 ? [0, 0, 0, 0, 0, 0] : (S.uframes[n] || [0, 0, 0, 0, 0, 0]));
   let tExec = 0;
-  const snapshot = () => { snaps.push({ R: { ...S.R }, PR: JSON.parse(JSON.stringify(S.PR)), out: { ...S.out }, uf: S.uf, ut: S.ut, override: S.override }); };
+  // Pulsed outputs still on: {key, until}; pulseLog keeps every pulse for the playback panel
+  const pulses = [], pulseLog = [];
+  const waitTimeout = +st.waitTimeout > 0 ? +st.waitTimeout : WAIT_TIMEOUT_DEFAULT;
+  let stack = null;
+  const snapshot = () => { const top = stack && stack[stack.length - 1]; snaps.push({ R: { ...S.R }, PR: JSON.parse(JSON.stringify(S.PR)), out: { ...S.out }, uf: S.uf, ut: S.ut, override: S.override, ar: top && top.args ? top.args.slice() : null }); };
   snapshot();
   const inputVal = (key, t) => {
     const d = (st.inputs || {})[key]; if (!d) return 0;
@@ -573,6 +601,7 @@ function simulate(rootName, programs, st) {
   const nextInputChange = (t) => {
     let best = null;
     for (const k in st.inputs || {}) { const d = st.inputs[k]; if (d.at != null && d.at !== '' && +d.at > t + 1e-9 && (best == null || +d.at < best)) best = +d.at; }
+    for (const p of pulses) if (p.until > t + 1e-9 && (best == null || p.until < best)) best = p.until;
     return best;
   };
   // current robot pose
@@ -594,10 +623,15 @@ function simulate(rootName, programs, st) {
       case 'R': if (!(n in S.R)) { warnUninitR(n); S.R[n] = 0; } return S.R[n];
       case 'PR': { const pr = prGet(n); if (r.elem != null) return pr.v[r.elem - 1] ?? 0; return { pr: { type: pr.type, v: pr.v.slice() } }; }
       case 'P': { const P = (byName[curProgName].pos || {})[n]; if (!P) throw new TPError(`P[${n}] has no position data`); return { pr: P.cart ? { type: 'cart', v: P.cart.slice() } : { type: 'joint', v: P.joints.slice() } }; }
-      case 'AR': return 0;
+      case 'AR': {
+        const args = stack[stack.length - 1].args || [];
+        if (n < 1 || n > args.length) throw new TPError(`AR[${n}] wasn't passed in: ${args.length ? `the CALL only gives ${args.length} argument${args.length > 1 ? 's' : ''}` : 'this program was started or called without arguments'}. The controller stops with an alarm here. Add it to the CALL, like CALL ${curProgName}(${Array.from({ length: Math.max(n, 1) }, (_, i) => i + 1).join(',')}).`);
+        return args[n - 1];
+      }
       default: {
         const key = `${r.kind}[${n}]`;
         if (INPUT_KINDS.has(r.kind)) return inputVal(key, tExec);
+        const p = pulses.find(x => x.key === key); if (p && tExec >= p.until - 1e-9) return 0;
         return S.out[key] ?? 0;
       }
     }
@@ -611,6 +645,7 @@ function simulate(rootName, programs, st) {
   }
   function evalNode(n) {
     if (n.num != null) return n.num;
+    if (n.str != null) return n.str;
     if (n.ref) return readRef(n.ref);
     if (n.pos) {
       if (n.pos === 'JPOS') return { pr: { type: 'joint', v: cur.q.slice() } };
@@ -623,6 +658,10 @@ function simulate(rootName, programs, st) {
     if (n.op === 'AND') return a && evalNode(n.b) ? 1 : 0;
     if (n.op === 'OR') return a || evalNode(n.b) ? 1 : 0;
     const b = evalNode(n.b);
+    if (typeof a === 'string' || typeof b === 'string') {
+      if (typeof a === 'string' && typeof b === 'string' && (n.op === '=' || n.op === '<>')) return (a === b) === (n.op === '=') ? 1 : 0;
+      throw new TPError('A text argument can only be compared with = or <> to other text');
+    }
     if (a && a.pr || b && b.pr) {
       if (!(a && a.pr && b && b.pr) || (n.op !== '+' && n.op !== '-')) throw new TPError('Position registers can only be added to or subtracted from other positions');
       return { pr: prAdd(a.pr, b.pr, n.op === '+' ? 1 : -1) };
@@ -687,7 +726,7 @@ function simulate(rootName, programs, st) {
     return { p: world.p, R: world.R, q, label, isPR: ref.kind === 'PR', taught: ref.kind === 'P' };
   }
 
-  const stack = [{ prog: root.name, pc: 0, rootLine: null }];
+  stack = [{ prog: root.name, pc: 0, rootLine: null }];
   let stopReason = null, moveCount = 0;
   const rootLineNow = () => stack.length === 1 ? curLine : stack[0].callLine;
   const pushStep = (kind, extra) => steps.push({ prog: curProgName, line: curLine, kind, t: tExec, snap: snaps.length - 1, seg: segs.length, depth: stack.length, rootLine: rootLineNow(), ...extra });
@@ -704,16 +743,24 @@ function simulate(rootName, programs, st) {
     if (at == null) { flag(prog.name, curLine, 'bad', `LBL[${n}] doesn't exist`, `The jump goes to LBL[${n}], but no line in ${prog.name} defines it. The controller stops here with an alarm.`); stopReason = 'error'; return false; }
     frame.pc = at; return true;
   };
-  const doCall = (name) => {
+  const doCall = (name, argList, label) => {
     const p = byName[name];
-    if (!p) { flag(curProgName, curLine, 'bad', `CALL ${name}: program not loaded`, `Load ${name}.ls (Open .ls…) so the simulator can run it. For now the call is skipped.`); return; }
+    if (!p) { flag(curProgName, curLine, 'bad', `${label || 'CALL ' + name}: program ${name} not loaded`, `Load ${name}.ls (Open .ls…) so the simulator can run it. For now the call is skipped.`); return; }
     if (stack.length > 30) { flag(curProgName, curLine, 'bad', 'Too many nested CALLs', 'Programs call each other more than 30 deep, which usually means a program calls itself. Stopped.'); stopReason = 'error'; return; }
+    // arguments are read in the caller, so AR[ ] here still means the caller's own arguments
+    const args = (argList || []).map(a => { const v = evalE(a); if (v && v.pr) throw new TPError('Positions can’t be passed as arguments'); return v; });
     if (stack.length === 1) stack[0].callLine = curLine;
-    stack.push({ prog: p.name, pc: 0 });
+    stack.push({ prog: p.name, pc: 0, args: args.length ? args : null });
+    changed();
   };
+  const popFrame = () => { stack.pop(); if (stack.length) changed(); };
   const doAction = (frame, prog, action, after) => {
     if (action.act === 'jmp') return jumpTo(frame, prog, action.lbl);
-    frame.pc = after; doCall(action.prog); return true;
+    frame.pc = after; doCall(action.prog, action.args); return true;
+  };
+  // Pulses switch off on their own; called before each line so snapshots and conditions see it
+  const expirePulses = () => {
+    for (let i = pulses.length - 1; i >= 0; i--) if (tExec >= pulses[i].until - 1e-9) { S.out[pulses[i].key] = 0; pulses.splice(i, 1); changed(); }
   };
   for (const p of programs) for (const se of p.structErrors || []) flag(p.name, se.line, 'bad', 'Program structure', se.msg);
 
@@ -723,9 +770,10 @@ function simulate(rootName, programs, st) {
     if (moveCount >= LIMITS.moves) { stopReason = 'moves'; break; }
     const frame = stack[stack.length - 1];
     const prog = byName[frame.prog];
-    if (frame.pc >= prog.ins.length) { stack.pop(); if (!stack.length) { stopReason = 'end'; break; } continue; }
+    if (frame.pc >= prog.ins.length) { popFrame(); if (!stack.length) { stopReason = 'end'; break; } continue; }
     const ins = prog.ins[frame.pc];
     curProgName = prog.name; curLine = ins.num;
+    expirePulses();
     try {
       switch (ins.type) {
         case 'empty': case 'comment': case 'remark': case 'lbl': case 'endif':
@@ -741,11 +789,20 @@ function simulate(rootName, programs, st) {
         case 'abort':
           pushStep('logic'); stopReason = 'abort'; break;
         case 'end':
-          pushStep('logic'); stack.pop(); if (!stack.length) stopReason = 'end'; break;
+          pushStep('logic'); popFrame(); if (!stack.length) stopReason = 'end'; break;
         case 'jmp':
           pushStep('logic'); jumpTo(frame, prog, ins.lbl); break;
         case 'call':
-          pushStep('logic'); frame.pc++; doCall(ins.prog); break;
+          pushStep('logic'); frame.pc++; doCall(ins.prog, ins.args); break;
+        case 'macro': {
+          pushStep('logic'); frame.pc++;
+          const mapped = (st.macros || {})[ins.name];
+          const target = mapped ? mapped.toUpperCase() : byName[ins.name] ? ins.name : null;
+          if (!target) { flag(prog.name, ins.num, 'info', `Macro "${ins.text}" isn't set up`, `If this is a macro, the controller runs whatever program the macro table (MENU › SETUP › Macro) assigns to it. Load that program (Open .ls…) and pick it under Settings › Macros. Otherwise check the spelling: the simulator doesn't know this instruction. For now the line is skipped.`, 'macro' + ins.name); break; }
+          if (!mapped) flag(prog.name, ins.num, 'info', `Ran ${target} as a macro`, `On the controller a program only runs as a macro once it is in the macro table (MENU › SETUP › Macro). The simulator ran ${target} because it has the same name.`, 'macroAuto' + ins.name);
+          doCall(target, ins.args, `Macro "${ins.text}"`);
+          break;
+        }
         case 'if': {
           checkFlags(ins.cond, prog.name, ins.num, true);
           const v = evalE(ins.cond); pushStep('logic', { cond: !!v });
@@ -792,7 +849,7 @@ function simulate(rootName, programs, st) {
         }
         case 'waitc': {
           checkFlags(ins.cond, prog.name, ins.num, true);
-          const t0 = tExec, limit = ins.timeoutLbl ? WAIT_TIMEOUT_DEFAULT : Infinity;
+          const t0 = tExec, limit = ins.timeoutLbl ? waitTimeout : Infinity;
           let ok = !!evalE(ins.cond), tt = t0;
           while (!ok) {
             const nx = nextInputChange(tt);
@@ -800,7 +857,7 @@ function simulate(rootName, programs, st) {
             tt = nx; tExec = tt; ok = !!evalE(ins.cond); tExec = t0;
           }
           if (ok) { const d = tt - t0; pushStep('wait', { dur: d, cond: true }); if (d > 0) addDwell(d, 'cond'); frame.pc++; }
-          else if (ins.timeoutLbl) { pushStep('wait', { dur: limit, cond: false }); addDwell(limit, 'timeout'); flag(prog.name, ins.num, 'info', 'WAIT timed out', `The condition never came true, so after the ${WAIT_TIMEOUT_DEFAULT} s timeout the program jumps to LBL[${idxOf(ins.timeoutLbl)}]. (The real timeout comes from $WAITTMOUT.)`); jumpTo(frame, prog, ins.timeoutLbl); }
+          else if (ins.timeoutLbl) { pushStep('wait', { dur: limit, cond: false }); addDwell(limit, 'timeout'); flag(prog.name, ins.num, 'info', 'WAIT timed out', `The condition never came true, so after the ${waitTimeout} s timeout the program jumps to LBL[${idxOf(ins.timeoutLbl)}]. The real timeout is a controller setting; change the simulator's under Settings › WAIT timeout.`); jumpTo(frame, prog, ins.timeoutLbl); }
           else { pushStep('wait', { dur: 2, cond: false }); addDwell(2, 'forever'); flag(prog.name, ins.num, 'bad', 'Waits forever', `"${ins.text}" never becomes true with the inputs as set, so the robot would sit here forever. Change the input under Inputs, or set it to switch on after a few seconds.`); stopReason = 'wait'; }
           break;
         }
@@ -816,8 +873,12 @@ function simulate(rootName, programs, st) {
         case 'assign': {
           const L = ins.lhs, n = idxOf(L);
           if (ins.pulse != null) {
-            const key = `${L.kind}[${n}]`; S.out[key] = 1; changed(); ioEvents.push({ key, t: tExec, v: 1, pulse: ins.pulse }); pushStep('logic'); frame.pc++; S.out[key] = 0; changed(); break;
+            // the output stays on for the pulse time while the program carries on
+            const key = `${L.kind}[${n}]`, at = pulses.findIndex(p => p.key === key); if (at >= 0) { pulses[at].log.t1 = tExec; pulses.splice(at, 1); }
+            S.out[key] = 1; const log = { key, t0: tExec, t1: tExec + ins.pulse }; pulses.push({ key, until: log.t1, log }); pulseLog.push(log);
+            changed(); ioEvents.push({ key, t: tExec, v: 1, pulse: ins.pulse }); pushStep('logic'); frame.pc++; break;
           }
+          { const at = pulses.findIndex(p => p.key === `${L.kind}[${n}]`); if (at >= 0) { pulses[at].log.t1 = tExec; pulses.splice(at, 1); } }
           checkFlags(ins.rhs, prog.name, ins.num, false);
           const ra = ins.rhs.ast;
           // PR[i]=PR[i]-PR[i] is the standard way to clear a register; don't warn about its old value
@@ -825,6 +886,7 @@ function simulate(rootName, programs, st) {
             const old = S.PR[n]; S.PR[n] = { type: old ? old.type : 'cart', v: [0, 0, 0, 0, 0, 0] }; changed(); pushStep('logic'); frame.pc++; break;
           }
           const v = evalE(ins.rhs);
+          if (typeof v === 'string' && L.kind !== 'SR') throw new TPError(`${L.kind}[ ] holds a number, but this argument is text`);
           if (L.kind === 'R') { if (v && v.pr) throw new TPError('Can’t store a whole position in R[ ]; use PR[ ] or pick one element like PR[1,3]'); S.R[n] = v; S.rSet.add(n); }
           else if (L.kind === 'PR') {
             if (L.elem != null) { if (v && v.pr) throw new TPError('PR[i,j] holds a single number'); const pr = prGet(n); pr.v[L.elem - 1] = v; }
@@ -860,7 +922,7 @@ function simulate(rootName, programs, st) {
   if (stopReason === 'steps') flag(root.name, curLine, segs.some(s => s.mt !== 'W') ? 'info' : 'warn', 'Program loops forever', `The simulator stopped after ${LIMITS.steps.toLocaleString()} lines. ${segs.length ? 'This is normal for a program that loops until an input changes; ' : 'The loop never moves or waits, so the real controller would just spin here. '}the playback shows the first part.`, 'cap');
   if (stopReason === 'time') flag(root.name, curLine, 'info', 'Program keeps running', `The simulator stopped after ${st.maxTime || 120} s of program time. Programs that loop forever (like waiting for an input) are cut off here. Change "Simulate up to" in Settings for a longer run.`, 'cap');
   if (stopReason === 'moves') flag(root.name, curLine, 'info', 'Program keeps running', `The simulator stopped after ${LIMITS.moves} moves.`, 'cap');
-  return finishSim({ root, programs, byName, segs, steps, snaps, issues, ioEvents, st, stopReason, start: cur, uframesFinal: S.uframes, toolsFinal: S.tools });
+  return finishSim({ root, programs, byName, segs, steps, snaps, issues, ioEvents, pulses: pulseLog, st, stopReason, start: cur, uframesFinal: S.uframes, toolsFinal: S.tools });
 }
 
 // Blending, timeline, motion findings
@@ -987,4 +1049,4 @@ function runSim(rootName, programs, st) {
   return res;
 }
 
-if (typeof module !== 'undefined') module.exports = { parseLS, splitLS, makeProgram, parsePositions, toLS, formatPosition, runSim, simulate, fk, ik, wprToR, rToWpr, frameOf, toWorld, toFrame, poseToV6, collectRefs, parseLine, parseExpr, refShort, HOME, ROBOT, quatToR, lerp3, lerpN };
+if (typeof module !== 'undefined') module.exports = { parseLS, splitLS, makeProgram, parsePositions, toLS, formatPosition, runSim, macroKey, simulate, fk, ik, wprToR, rToWpr, frameOf, toWorld, toFrame, poseToV6, collectRefs, parseLine, parseExpr, refShort, HOME, ROBOT, quatToR, lerp3, lerpN };

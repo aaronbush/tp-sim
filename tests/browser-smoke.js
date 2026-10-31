@@ -37,6 +37,14 @@ server.listen(0, async () => {
     await lines[15].click(); await page.keyboard.press('End'); await page.keyboard.type('+'); await page.waitForTimeout(700);
     check(`${w}px: typo shows a finding`, (await page.$$eval('#issues li .t', e => e.map(x => x.textContent))).some(t => /read this line/.test(t)));
     await page.keyboard.press('Backspace'); await page.waitForTimeout(700);
+    // macros and CALL arguments
+    await page.click('.tab:has-text("STACK_PARTS")'); await page.waitForTimeout(400);
+    const macs = await page.$$eval('#macroFields select', e => e.map(x => x.value));
+    check(`${w}px: macro table filled from the example`, macs.join() === 'GRIP_CLOSE,GRIP_OPEN', macs.join());
+    let args = false;
+    for (let k = 0; k < 30 && !args; k++) { await page.click('#stepBtn'); args = /AR\[1\]/.test(await page.textContent('#statebody')); }
+    check(`${w}px: arguments show inside PICK_PART`, args);
+    if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `args-${w}-${scheme}.png`), fullPage: true }); }
     // teach mode
     await page.click('#teachBtn'); await page.waitForTimeout(200);
     await page.click('#jogGrid button[data-ax="0"][data-s="1"]');

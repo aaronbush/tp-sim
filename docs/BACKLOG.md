@@ -4,14 +4,15 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
 
 ## Current state
 
-- `main` holds v1, the read-only path viewer.
-- **PR #1** (`interpreter-and-editor`) adds the interpreter, the CodeMirror editor, the Registers & I/O panel, teach mode, the examples and the tests. It was **open and unmerged** at hand-off. Aaron has been previewing it locally. Build new work on top of it, by branching from `interpreter-and-editor` or from `main` once it's merged, rather than redoing it.
+- **PR #1** (interpreter, editor, Registers & I/O panel, teach mode, examples, tests) was merged to `main` on 2026-10-30.
+- `macros-callargs-pulse` adds macros, CALL arguments, timed PULSE and a WAIT timeout setting.
 
 ## Needs verification
 
 - **Exported `.ls` on a real controller.** `toLS()` follows the format of the owner's exported files, but nobody has loaded a downloaded file on a controller yet. Watch especially for line spacing, `C` continuation lines, options on one line versus a `:` continuation, the header fields `PROG_SIZE`/`MEMORY_SIZE`, and the CONFIG string. Loading also needs the controller's ASCII program loader option.
 - **iPad / touch.** CodeMirror editing, drag in teach mode, jog button repeat, and the file picker haven't been tested on an iPad. The owner uses Firefox and Chrome on an iPad.
-- **Default WAIT timeout.** `WAIT … TIMEOUT,LBL[ ]` uses 30 s in place of `$WAITTMOUT`. Confirm the controller's default.
+- **Default WAIT timeout.** `WAIT … TIMEOUT,LBL[ ]` starts at 30 s (changeable in Settings). Confirm the controller's default.
+- **Macro and argument details.** Not checked against a controller: how macro names with spaces appear in exported `.ls` files, the quote style for text arguments, and whether `IF …,` can take a macro as its action (not supported here).
 
 ## Simulation gaps (each is skipped or approximated today)
 
@@ -24,8 +25,8 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
   - `TIMER[ ]`
   - system variables (`$...`)
   - `MESSAGE`, `PAYLOAD`, `UALM`, `RSR`
-  - `CALL` arguments (`AR[ ]` reads as 0)
-  - macros
+  - string registers (`SR[ ]`); text arguments work only for `=` / `<>` checks
+  - macros run from DI/UI buttons or the MANUAL FCTNS menu (only macro lines in a program run)
   - background logic
   - multiple motion groups
   - `JMP` into or out of `FOR` blocks (works naively)
