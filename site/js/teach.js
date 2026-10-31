@@ -186,6 +186,30 @@
   view.addEventListener('pointerup', endDrag, true);
   view.addEventListener('pointercancel', endDrag, true);
 
+  // drag up/down in the height strip beside the paper view to move the tool in World Z
+  const side = $('sideZ');
+  side.addEventListener('pointerdown', ev => {
+    if (!st.on || !sideMap) return;
+    ev.preventDefault();
+    const f = fk(st.q, curTool()), top = side.getBoundingClientRect().top;
+    // keep the grab offset so the tool doesn't jump to the pointer
+    st.sideDrag = { top, dh: (f.tip[2] - sideMap.sz) - sideMap.hOf(ev.clientY - top), p: f.tip.slice(), R: f.R, id: ev.pointerId };
+    try { side.setPointerCapture(ev.pointerId); } catch (e) {}
+  });
+  side.addEventListener('pointermove', ev => {
+    const d = st.sideDrag; if (!d) return;
+    const snap = v => Math.round(v * (st.step < 1 ? 10 : 1)) / (st.step < 1 ? 10 : 1);
+    tryPose([d.p[0], d.p[1], snap(sideMap.sz + sideMap.hOf(ev.clientY - d.top) + d.dh)], d.R);
+  });
+  const endSide = () => { if (!st.sideDrag) return; try { side.releasePointerCapture(st.sideDrag.id); } catch (e) {} st.sideDrag = null; };
+  side.addEventListener('pointerup', endSide);
+  side.addEventListener('pointercancel', endSide);
+
+  // choose the line a recorded point goes after without touching the editor (phones hide it in teach)
+  const stepLine = d => { const e = programs[active]; if (!e) return; edProg.setCursorLine(Math.max(1, Math.min(e.lines.length || 1, edProg.cursorLine() + d))); updateRecUI(); };
+  $('recPrev').addEventListener('click', () => stepLine(-1));
+  $('recNext').addEventListener('click', () => stepLine(1));
+
   // ---- mode on/off ----
   function setOn(on) {
     st.on = on;
@@ -220,7 +244,7 @@
       }
       const moved = !teachTip || teachTip.some((v, k) => Math.abs(v - f.tip[k]) > 1e-6);
       teachTip = f.tip;
-      if ((moved || paperDirty) && sim && sim.T.p.length) { drawPaper(sampleAt(t).i, 0); paperDirty = false; }
+      if ((moved || paperDirty) && sim && sim.T.p.length) { drawPaper(sampleAt(t).i, 0); drawSide(f.tip); paperDirty = false; }
       const c = ctx(), loc = toFrame(frameOf(ufVec(c.uf)), f.tip, f.R), wpr = rToWpr(loc.R);
       const h = sim ? f.tip[2] - sim.surfZ : 0;
       const state = sim && h < -settings.comp ? '<span class="pen crash">BELOW SURFACE</span>' : sim && h <= settings.tol ? '<span class="pen down">ON SURFACE</span>' : `<span class="pen up">${fmt(h, 0)} mm ABOVE</span>`;

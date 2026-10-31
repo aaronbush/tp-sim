@@ -67,8 +67,8 @@ header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px
 .speeds button { font: 500 12px var(--f-mono); border: 0; padding: 5px 8px; background: var(--panel); color: var(--fg); cursor: pointer; border-right: 1px solid var(--line); }
 .speeds button:last-child { border-right: 0; }
 .speeds button[aria-pressed="true"] { background: var(--fg); color: var(--panel); }
-#paperWrap { padding: 10px; }
-#paper { width: 100%; aspect-ratio: 5 / 4; display: block; border-radius: 3px; max-width: 100%; }
+#paperWrap { padding: 10px; display: flex; gap: 8px; align-items: flex-start; }
+#paper { flex: 1; min-width: 0; width: 100%; aspect-ratio: 5 / 4; display: block; border-radius: 3px; max-width: 100%; }
 .paper-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; font: 12px var(--f-mono); color: var(--muted); padding: 0 12px 10px; }
 .paper-foot label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
 .dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
@@ -238,3 +238,76 @@ table.regs tr.chg td { background: color-mix(in srgb, var(--accent) 18%, transpa
 .help-toc a:hover { background: var(--paper); }
 .help-keys td { padding: 3px 12px 3px 0; vertical-align: top; }
 .sw { display: inline-block; width: 12px; height: 4px; border-radius: 2px; vertical-align: middle; }
+
+/* height strip beside the paper view */
+#sideZ { flex: 0 0 60px; width: 60px; display: block; border-radius: 3px; touch-action: none; }
+#sideZ.overlay { position: absolute; right: 6px; top: 6px; width: 54px; height: calc(100% - 12px) !important; z-index: 2; border: 1px solid var(--line); }
+#sideZ.grab { cursor: ns-resize; }
+
+/* teach: pick the line a recorded point goes after */
+.linepick { display: inline-flex; gap: 2px; }
+.rec .brk { display: none; }
+.linepick .btn { padding: 4px 8px; line-height: 1; }
+
+/* phone tabs and Key button exist only on narrow screens */
+.phonetabs, .keybtn { display: none; }
+.badge-n { display: inline-block; min-width: 1.4em; margin-left: 4px; padding: 0 4px; border-radius: 999px; background: var(--bad); color: #fff; font: 700 11px/1.4 var(--f-body); }
+
+/* bigger tap targets on touch screens */
+@media (pointer: coarse) {
+  .btn, .tab, .seg button, .speeds button, .ptabs button, .jl select, .help-toc a { min-height: 44px; }
+  .speeds button, .helpbtn, .linepick .btn { min-width: 44px; }
+  .tab { padding-inline: 14px; }
+}
+
+/* ---------- phone layout: the 3D view stays at the top, tabs pick what's under it ---------- */
+@media (max-width: 699px) {
+  body { padding: 0 0 calc(62px + env(safe-area-inset-bottom)); }
+  .wrap { display: flex; flex-direction: column; gap: 10px; }
+  header.top { padding: 8px 12px 0; gap: 6px 8px; }
+  .brand { display: none; }
+  .head-actions { width: 100%; flex-wrap: nowrap; }
+  #exampleSel { flex: 1; min-width: 0; }
+  .tabs { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0; padding-bottom: 2px; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; }
+  .grid-main, .grid-mid, .grid-low, #workPanel { display: contents; }
+  #workPanel > .panel-h, #teachBtn, .hlab { display: none; }
+  #view3d { position: sticky; top: 0; z-index: 4; height: 46dvh; min-height: 250px; flex: none; border-radius: 0; border-block: 1px solid var(--line); }
+  .wrap [data-pane] { order: 2; margin-inline: 12px; }
+  #findingsPanel { order: 1; }
+  .transport, .jogbar { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .jogbar { gap: 8px; }
+  #jogUnit, .jhint .hint { display: none; }
+  .jhint { justify-content: flex-end; order: 1; }
+  .jogbar .rec { order: 2; }
+  /* Record / Touch up stay in reach above the tab bar while the jog pad scrolls */
+  .jogbar .rec { position: sticky; bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 3; background: var(--panel-2); margin: 0 -12px -10px; padding: 8px 12px 10px; border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; }
+  .jogbar .rec { gap: 6px 8px; }
+  .rec .linepick { order: -2; }
+  .recctx { order: -1; flex: 1 1 0; min-width: 0; font-size: 11.5px; }
+  .rec .brk { display: block; order: 0; flex-basis: 100%; height: 0; }
+  .rec > :not(.linepick):not(.recctx):not(.brk) { order: 1; }
+  .rec .long { display: none; }
+  #recNew { flex: 1; }
+  body[data-pane="teach"] #view3d { height: 40dvh; }
+  .panel-h { flex-wrap: wrap; }
+  .panel-h .ptabs { flex: none; }
+  #editorPanel .head-actions, #dataPanel .head-actions { width: 100%; }
+  #dataPanel .head-actions .btn { flex: 1; }
+  #progName { flex: 1; min-width: 0; }
+  .readout { pointer-events: auto; cursor: pointer; max-width: calc(100% - 84px); left: 8px; top: 8px; }
+  .readout:not(.full) .rows { display: none; }
+  .readout .cur { max-width: 100%; margin-bottom: 0; }
+  .keybtn { display: inline-block; position: absolute; left: 8px; bottom: 8px; z-index: 3; }
+  .legend { display: none; right: auto; left: 8px; bottom: 58px; max-width: calc(100% - 84px); }
+  .legend.show { display: flex; }
+  .phonetabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  .phonetabs button { flex: 1; min-height: 56px; border: 0; background: none; color: var(--muted); font: 600 13px var(--f-body); letter-spacing: .02em; cursor: pointer; border-top: 3px solid transparent; }
+  .phonetabs button[aria-pressed="true"] { color: var(--fg); border-top-color: var(--accent); }
+  body:not([data-pane="run"]) .wrap [data-pane="run"],
+  body:not([data-pane="teach"]) .wrap [data-pane="teach"],
+  body:not([data-pane="program"]) .wrap [data-pane="program"],
+  body:not([data-pane="data"]) .wrap [data-pane="data"],
+  body:not([data-pane="more"]) .wrap [data-pane="more"] { display: none !important; }
+}

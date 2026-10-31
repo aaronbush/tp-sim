@@ -24,6 +24,10 @@ server.listen(0, async () => {
     page.on('console', m => { if (m.type() === 'error' && !/fonts|net::/.test(m.text())) errs.push(m.text()); });
     await page.route('https://fonts.**', r => r.abort()); // fonts may be unreachable in sandboxes
     await page.goto(url); await page.waitForTimeout(1500);
+    // narrow screens use the phone layout: bottom tabs pick what shows under the 3D view
+    const phone = await page.isVisible('#phoneTabs');
+    const pane = async p => { if (phone) { await page.click(`#phoneTabs [data-pane="${p}"]`); await page.waitForTimeout(150); } };
+    const teach = async on => { if (phone) await pane(on ? 'teach' : 'run'); else await page.click('#teachBtn'); await page.waitForTimeout(200); };
     const tabs = await page.$$eval('.tab', e => e.map(x => x.textContent.replace('×', '').trim()));
     check(`${w}px: examples load as tabs`, tabs.length >= 6, tabs.join(' '));
     for (const name of tabs) {
@@ -33,10 +37,12 @@ server.listen(0, async () => {
     check(`${w}px: no horizontal scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     // edit a line and expect a parse error finding, then undo it
     await page.click('.tab:has-text("LOOP_SQUARES")'); await page.waitForTimeout(250);
+    await pane('program');
     const lines = await page.$$('#edProg .cm-line');
     await lines[15].click(); await page.keyboard.press('End'); await page.keyboard.type('+'); await page.waitForTimeout(700);
     check(`${w}px: typo shows a finding`, (await page.$$eval('#issues li .t', e => e.map(x => x.textContent))).some(t => /read this line/.test(t)));
     await page.keyboard.press('Backspace'); await page.waitForTimeout(700);
+    await pane('run');
     // macros and CALL arguments
     await page.click('.tab:has-text("STACK_PARTS")'); await page.waitForTimeout(400);
     const macs = await page.$$eval('#macroFields select', e => e.map(x => x.value));
@@ -46,6 +52,7 @@ server.listen(0, async () => {
     check(`${w}px: arguments show inside PICK_PART`, args);
     if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `args-${w}-${scheme}.png`), fullPage: true }); }
     // data screens: after-run values, keep them, comments, PR rows
+    await pane('data');
     check(`${w}px: data screen shows R[1] after run`, (await page.textContent('#arR1')).trim() === '3');
     await page.click('#dataKeep'); await page.waitForTimeout(400);
     check(`${w}px: keep copies after-run values to start`, await page.inputValue('[data-dr="1"]') === '3');
@@ -54,6 +61,15 @@ server.listen(0, async () => {
     await page.click('#dtabPR'); await page.selectOption('[data-dprt="1"]', 'joint'); await page.waitForTimeout(400);
     check(`${w}px: PR row gets six values`, (await page.$$('[data-dpr="1"]')).length === 6);
     await page.click('#dtabR');
+    if (phone) {
+      // the 3D view stays on screen while the page scrolls, and the height strip sits on its edge
+      await page.evaluate(() => scrollTo(0, 400)); await page.waitForTimeout(150);
+      const v = await page.evaluate(() => { const r = document.getElementById('view3d').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; });
+      check(`${w}px: 3D view stays at the top when scrolled`, v[0] <= 1 && v[1] > 200, v.join(','));
+      check(`${w}px: height strip is on the 3D view`, await page.evaluate(() => document.getElementById('sideZ').parentNode.id === 'view3d'));
+      check(`${w}px: other panes are hidden`, !(await page.isVisible('#editorPanel')) && !(await page.isVisible('#findingsPanel')));
+    }
+    await pane('run');
     // playing must not scroll the page to the editor (phones stack the panels)
     await page.evaluate(() => document.getElementById('view3d').scrollIntoView({ block: 'start' }));
     const y0 = await page.evaluate(() => scrollY);
@@ -61,7 +77,12 @@ server.listen(0, async () => {
     const y1 = await page.evaluate(() => scrollY); await page.click('#playBtn');
     check(`${w}px: playback leaves the page where it is`, Math.abs(y1 - y0) < 2, `${y0} -> ${y1}`);
     // teach mode
-    await page.click('#teachBtn'); await page.waitForTimeout(200);
+    await teach(true);
+    if (phone) {
+      const before = await page.evaluate(() => edProg.cursorLine());
+      await page.click('#recNext'); await page.waitForTimeout(100);
+      check(`${w}px: line picker moves the record line`, await page.evaluate(() => edProg.cursorLine()) === before + 1);
+    }
     await page.click('#jogGrid button[data-ax="0"][data-s="1"]');
     check(`${w}px: teach readout`, /TEACH/.test(await page.textContent('#readout')));
     await page.click('[data-help="help-teach"]'); await page.waitForTimeout(200);
@@ -69,7 +90,8 @@ server.listen(0, async () => {
     check(`${w}px: teach ? opens help at the teach section`, teachHelp);
     if (shots) await page.screenshot({ path: path.join(shots, `help-${w}-${scheme}.png`) });
     await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-    await page.click('#teachBtn');
+    if (shots && phone) await page.screenshot({ path: path.join(shots, `phone-teach-${scheme}.png`) });
+    await teach(false);
     await page.click('#helpBtn'); await page.waitForTimeout(150);
     const opened = await page.evaluate(() => document.getElementById('helpDlg').open);
     await page.click('#helpClose');

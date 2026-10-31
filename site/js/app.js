@@ -244,6 +244,7 @@ function jumpToLine(line) {
 
 // ---------- findings ----------
 function renderIssues() {
+  const nIss = sim.issues.filter(i => i.sev !== 'info').length; $('tabBadge').textContent = nIss; $('tabBadge').hidden = !nIss;
   const c = { bad: 0, warn: 0, info: 0 }; sim.issues.forEach(i => c[i.sev]++);
   $('issueCount').textContent = sim.issues.length ? `${c.bad} problems · ${c.warn} warnings · ${c.info} notes` : 'none';
   const moves = sim.segs.filter(s => s.mt !== 'W').length;
@@ -653,6 +654,93 @@ function drawPaper(idx, frac) {
   else { const r = Math.min(26, 5 + h / 12); ctx.beginPath(); ctx.arc(tx, ty, r, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(tx - 4, ty); ctx.lineTo(tx + 4, ty); ctx.moveTo(tx, ty - 4); ctx.lineTo(tx, ty + 4); ctx.stroke(); }
 }
 
+// Height strip: a vertical indicator of the tool's height above the surface. Linear over the working
+// zone, squeezed above a break so tall moves (start, home) don't flatten it. Dots are taught heights.
+// In teach mode, dragging in it moves the tool in World Z (teach.js uses sideMap).
+const sideZ = $('sideZ');
+let sideMap = null;
+function drawSide(tip) {
+  const over = sideZ.classList.contains('overlay');
+  if (!over) sideZ.style.height = paper.clientHeight + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = sideZ.clientWidth, H = sideZ.clientHeight;
+  if (!W || !H) return;
+  if (sideZ.width !== Math.round(W * dpr) || sideZ.height !== Math.round(H * dpr)) { sideZ.width = Math.round(W * dpr); sideZ.height = Math.round(H * dpr); }
+  const ctx = sideZ.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = over ? css('--panel') : css('--paper'); ctx.globalAlpha = over ? 0.86 : 1; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+  if (!sim || !sim.T.p.length) { sideMap = null; return; }
+  const T = sim.T, sz = sim.surfZ, crash = settings.comp;
+  let top = 0; for (let i = 0; i < T.p.length; i++) top = Math.max(top, T.p[i][2] - sz);
+  top = Math.max(top, tip[2] - sz, 20);
+  const near = sim.ptLabels.map(pt => pt.p[2] - sz).filter(h => h < 150);
+  const lo = -crash - 8, hi = top + Math.max(10, top * 0.05), padT = 12, padB = 10;
+  let focus = Math.max(30, (near.length ? Math.max(...near) : 0) * 1.4, Math.min(tip[2] - sz, 150) * 1.15);
+  if (focus >= hi * 0.85) focus = hi;
+  const yBot = H - padB, yTop = padT, yFoc = focus === hi ? yTop : yTop + (yBot - yTop) * 0.25;
+  const Y = h => h <= focus ? yBot - (h - lo) / (focus - lo) * (yBot - yFoc) : yFoc - Math.sqrt((h - focus) / (hi - focus)) * (yFoc - yTop);
+  const hOf = y => y >= yFoc ? lo + (yBot - y) / (yBot - yFoc) * (focus - lo) : focus + ((yFoc - y) / (yFoc - yTop)) ** 2 * (hi - focus);
+  const k = (yBot - yFoc) / (focus - lo);
+  const step = [2, 5, 10, 25, 50, 100].find(v => v * k >= 20) || 250;
+  const ax = 24; // the scale line; labels sit left of it, the pointer to the right
+  ctx.font = '500 10px "IBM Plex Mono", monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+  const mut = css('--muted'), g2 = css('--grid2'), fg = css('--fg'), acc = css('--accent');
+  const tick = (h, label, len = 4) => { const y = Math.round(Y(h)) + 0.5; ctx.strokeStyle = g2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ax, y); ctx.lineTo(ax + len, y); ctx.stroke(); if (label) { ctx.fillStyle = mut; ctx.fillText(String(Math.round(h)), ax - 3, y); } };
+  for (let h = Math.ceil(lo / step) * step; h <= focus + 1e-9; h += step) tick(h, h > 0 && Y(h) < yBot - 6 && (focus === hi || Y(h) > yFoc + 8));
+  ctx.strokeStyle = g2; ctx.beginPath(); ctx.moveTo(ax + 0.5, yTop); ctx.lineTo(ax + 0.5, yBot); ctx.stroke();
+  if (focus < hi) {
+    tick(hi, true);
+    ctx.fillStyle = over ? css('--panel') : css('--paper'); ctx.fillRect(ax - 4, yFoc - 4, 9, 8);
+    ctx.strokeStyle = mut; ctx.beginPath(); for (const d of [-2, 2]) { ctx.moveTo(ax - 4, yFoc + d + 2); ctx.lineTo(ax + 4, yFoc + d - 2); } ctx.stroke();
+    ctx.fillStyle = mut; ctx.fillText(String(Math.round(focus)), ax - 3, yFoc + 9);
+  }
+  // surface and crash limit
+  ctx.strokeStyle = fg; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ax - 6, Y(0)); ctx.lineTo(W - 2, Y(0)); ctx.stroke();
+  ctx.fillStyle = mut; ctx.fillText('0', ax - 3, Y(0) - 7);
+  ctx.strokeStyle = css('--bad'); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(ax - 6, Y(-crash)); ctx.lineTo(W - 2, Y(-crash)); ctx.stroke(); ctx.setLineDash([]);
+  // taught point heights
+  ctx.fillStyle = fg;
+  sim.ptLabels.forEach(pt => { ctx.beginPath(); ctx.arc(ax + 0.5, Y(pt.p[2] - sz), 2.4, 0, Math.PI * 2); ctx.fill(); });
+  // the tool: a level bar from the surface plus a pointer and label
+  const h = tip[2] - sz, y = Y(h), bad = h < -crash;
+  ctx.fillStyle = bad ? css('--bad') : acc; ctx.globalAlpha = 0.25; ctx.fillRect(ax + 6, Math.min(y, Y(0)), W - ax - 9, Math.abs(Y(0) - y)); ctx.globalAlpha = 1;
+  ctx.strokeStyle = bad ? css('--bad') : acc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ax + 6, y); ctx.lineTo(W - 2, y); ctx.stroke();
+  ctx.fillStyle = bad ? css('--bad') : acc; ctx.beginPath(); ctx.moveTo(ax + 1, y); ctx.lineTo(ax + 8, y - 5); ctx.lineTo(ax + 8, y + 5); ctx.closePath(); ctx.fill();
+  const lab = bad ? 'crash' : h <= settings.tol ? 'on' : fmt(h, 0);
+  ctx.font = '600 11px "IBM Plex Mono", monospace';
+  const ly = y - 9 < padT ? y + 10 : y - 9, tw = ctx.measureText(lab).width;
+  ctx.fillStyle = over ? css('--panel') : css('--paper'); ctx.fillRect(W - 3 - tw - 3, ly - 7, tw + 6, 14);
+  ctx.fillStyle = bad ? css('--bad') : acc; ctx.fillText(lab, W - 3, ly); ctx.textAlign = 'left';
+  sideMap = { hOf, sz };
+  sideZ.classList.toggle('grab', !!teachTip);
+}
+
+// ---------- phone layout ----------
+const phoneMQ = window.matchMedia('(max-width: 699px)');
+function placeSide() {
+  const target = phoneMQ.matches ? $('view3d') : $('paperWrap');
+  if (sideZ.parentNode !== target) target.appendChild(sideZ);
+  sideZ.classList.toggle('overlay', phoneMQ.matches);
+  if (phoneMQ.matches) sideZ.style.height = '';
+  paperDirty = true;
+}
+function setPane(p) {
+  const teachOn = !!(teachHook && teachHook.active());
+  if (phoneMQ.matches && (p === 'teach') !== teachOn) $('teachBtn').click();
+  document.body.dataset.pane = p;
+  document.querySelectorAll('#phoneTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pane === p));
+  if (p !== 'teach') store.set('pane', p);
+  if (p === 'program') requestAnimationFrame(() => edProg.view.requestMeasure());
+  paperDirty = true; lastStepShown = -2;
+  if (phoneMQ.matches) window.scrollTo(0, 0);
+}
+$('phoneTabs').addEventListener('click', e => { const b = e.target.closest('button[data-pane]'); if (b) setPane(b.dataset.pane); });
+phoneMQ.addEventListener('change', () => { placeSide(); if (!phoneMQ.matches && document.body.dataset.pane === 'teach') setPane('run'); });
+placeSide();
+document.body.dataset.pane = store.get('pane', 'run');
+document.querySelectorAll('#phoneTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pane === document.body.dataset.pane));
+$('readout').addEventListener('click', () => { if (phoneMQ.matches) $('readout').classList.toggle('full'); });
+$('keyBtn').addEventListener('click', () => { const on = $('legend').classList.toggle('show'); $('keyBtn').setAttribute('aria-expanded', on); });
+
 // ---------- readout ----------
 function lineText(progName, line) { const e = programs.find(p => p.name === progName); return e ? cleanLine(e.lines[line - 1] || '') : ''; }
 function renderReadout(si, q, p, f) {
@@ -682,7 +770,7 @@ function frame(now) {
     const tool = toolAt(i);
     const fkr = poseRobot(q, tool) || fk(q, tool);
     if (inkObj) { const ends = inkObj.userData.ends; let lo = 0, hi = ends.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ends[m] <= i) lo = m + 1; else hi = m; } inkObj.geometry.setDrawRange(0, lo * 2); }
-    if (paperDirty) { drawPaper(i, f); paperDirty = false; }
+    if (paperDirty) { drawPaper(i, f); drawSide(p); paperDirty = false; }
     const si = currentStep();
     renderReadout(si, q, p, fkr);
     const pe = sim.pulses.reduce((n, p) => n + (p.t1 <= t ? 1 : 0), 0);
