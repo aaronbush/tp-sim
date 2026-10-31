@@ -64,7 +64,16 @@ server.listen(0, async () => {
     await page.click('#teachBtn'); await page.waitForTimeout(200);
     await page.click('#jogGrid button[data-ax="0"][data-s="1"]');
     check(`${w}px: teach readout`, /TEACH/.test(await page.textContent('#readout')));
+    await page.click('[data-help="help-teach"]'); await page.waitForTimeout(200);
+    const teachHelp = await page.evaluate(() => { const d = document.getElementById('helpDlg'), r = document.getElementById('help-teach').getBoundingClientRect(), b = d.querySelector('.help-b').getBoundingClientRect(); return d.open && r.top >= b.top - 2 && r.top < b.bottom; });
+    check(`${w}px: teach ? opens help at the teach section`, teachHelp);
+    if (shots) await page.screenshot({ path: path.join(shots, `help-${w}-${scheme}.png`) });
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
     await page.click('#teachBtn');
+    await page.click('#helpBtn'); await page.waitForTimeout(150);
+    const opened = await page.evaluate(() => document.getElementById('helpDlg').open);
+    await page.click('#helpClose');
+    check(`${w}px: ? button opens and closes help`, opened && !(await page.evaluate(() => document.getElementById('helpDlg').open)));
     if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `smoke-${w}-${scheme}.png`), fullPage: true }); }
     check(`${w}px: no page errors`, !errs.length, errs.join(' | '));
     await page.close();

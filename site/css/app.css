@@ -216,3 +216,25 @@ table.regs tr.chg td { background: color-mix(in srgb, var(--accent) 18%, transpa
 .dpar { font: 12px var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
 .dpar span { font: 600 11px var(--f-display); letter-spacing: .08em; text-transform: uppercase; margin-right: 6px; }
 @media (max-width: 640px) { .prgrid.prgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* help */
+.helpbtn { font-weight: 700; min-width: 2.2em; padding: 6px 8px; border-radius: 999px; }
+.jhint { flex-wrap: nowrap; align-items: flex-start; }
+.jhint .hint { flex: 1; margin: 0; }
+#helpDlg { width: min(680px, calc(100vw - 32px)); max-height: min(85vh, 900px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+#helpDlg::backdrop { background: rgba(0, 0, 0, .45); }
+#helpDlg[open] { display: flex; flex-direction: column; }
+.help-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.help-h h2 { font: 600 15px var(--f-display); letter-spacing: .09em; text-transform: uppercase; margin: 0; }
+.help-b { overflow: auto; padding: 4px 16px 16px; font: 14px/1.5 var(--f-body); }
+.help-b h3 { font: 600 13px var(--f-display); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+.help-b ol, .help-b ul { margin: 0; padding-left: 1.3em; }
+.help-b li { margin: 4px 0; }
+.help-b p { margin: 8px 0 0; color: var(--muted); }
+.help-b code { font: 12.5px var(--f-mono); background: var(--paper); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.help-b kbd { font: 12px var(--f-mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: var(--paper); }
+.help-toc { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; }
+.help-toc a { font: 600 12px var(--f-body); color: var(--fg); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.help-toc a:hover { background: var(--paper); }
+.help-keys td { padding: 3px 12px 3px 0; vertical-align: top; }
+.sw { display: inline-block; width: 12px; height: 4px; border-radius: 2px; vertical-align: middle; }

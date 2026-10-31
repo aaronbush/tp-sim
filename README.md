@@ -40,6 +40,7 @@ It works with the `.ls` export format used by FANUC controllers. This project is
   - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z** or Shift), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
   - **Record new point** adds a `P[n]` in the active user/tool frame and inserts an `L` or `J` move after the cursor line.
   - **Touch up** replaces the point on the cursor line. It takes out the line's `Offset,PR[ ]` if there is one; on a `PR[ ]` line it sets that register's start value in **Position Reg** instead.
+- **Help:** the **?** button (or the <kbd>?</kbd> key) opens a short guide: getting started, teaching points, registers, program features, the 3D view and shortcuts. The **?** in teach mode opens it at the teach steps.
 - **Views:** the arm animates in 3D with World, user-frame and tool-frame axes. A top-down "paper" view shows what the tool draws.
 - **Findings:** flags common problems. Motion:
   - a joint move used to draw on the part
