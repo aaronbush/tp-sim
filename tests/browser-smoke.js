@@ -42,6 +42,13 @@ server.listen(0, async () => {
     await lines[15].click(); await page.keyboard.press('End'); await page.keyboard.type('+'); await page.waitForTimeout(700);
     check(`${w}px: typo shows a finding`, (await page.$$eval('#issues li .t', e => e.map(x => x.textContent))).some(t => /read this line/.test(t)));
     await page.keyboard.press('Backspace'); await page.waitForTimeout(700);
+    // clicking program text only places the cursor; a line number jumps playback
+    const pos = () => page.evaluate(() => [t, currentStep()]);
+    const before = await pos();
+    await (await page.$$('#edProg .cm-line'))[8].click(); await page.waitForTimeout(150);
+    check(`${w}px: clicking text leaves playback alone`, (await pos()).join() === before.join());
+    await page.locator('#edProg .cm-lineNumbers .cm-gutterElement', { hasText: /^9$/ }).click(); await page.waitForTimeout(150);
+    check(`${w}px: clicking a line number jumps there`, await page.evaluate(() => sim.steps[currentStep()].line === 9 && edProg.cursorLine() === 9));
     await pane('run');
     // macros and CALL arguments
     await page.click('.tab:has-text("STACK_PARTS")'); await page.waitForTimeout(400);

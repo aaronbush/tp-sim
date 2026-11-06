@@ -171,17 +171,22 @@ const TPEditor = (() => {
     const readOnly = new Compartment();
     let suppress = false;
     const extensions = [
-      lineNumbers(), opts.counts ? countGutter : [], opts.lint ? lintGutter() : [],
+      lineNumbers(opts.onLineClick ? {
+        domEventHandlers: {
+          click(v, block) {
+            const n = v.state.doc.lineAt(block.from).number;
+            v.dispatch({ selection: { anchor: block.from } });
+            opts.onLineClick(n);
+            return true;
+          }
+        }
+      } : {}), opts.counts ? countGutter : [], opts.lint ? lintGutter() : [],
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       opts.language === 'tp' ? [tp, syntaxHighlighting(style), autocompletion({ override: [completeTP], icons: false }), execField, countField, unrunDeco] : [],
       theme, EditorView.lineWrapping, readOnly.of(EditorState.readOnly.of(false)),
       EditorView.updateListener.of(u => {
         if (u.docChanged && !suppress && opts.onChange) opts.onChange(u.state.doc.toString());
-        if (u.selectionSet && !u.docChanged && opts.onCursor) {
-          const pointer = u.transactions.some(tr => tr.isUserEvent('select.pointer'));
-          if (pointer) opts.onCursor(u.state.doc.lineAt(u.state.selection.main.head).number);
-        }
       }),
       EditorView.contentAttributes.of({ 'aria-label': opts.label || 'Program editor', spellcheck: 'false', autocorrect: 'off', autocapitalize: 'characters' })
     ];
