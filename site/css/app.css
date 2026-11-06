@@ -311,3 +311,7 @@ table.regs tr.chg td { background: color-mix(in srgb, var(--accent) 18%, transpa
   body:not([data-pane="data"]) .wrap [data-pane="data"],
   body:not([data-pane="more"]) .wrap [data-pane="more"] { display: none !important; }
 }
+
+/* a line number is the way to jump playback to that line */
+#edProg .cm-lineNumbers .cm-gutterElement { cursor: pointer; }
+#edProg .cm-lineNumbers .cm-gutterElement:hover { color: var(--fg); text-decoration: underline; }

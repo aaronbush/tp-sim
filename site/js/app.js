@@ -101,7 +101,7 @@ function flash(msg) { $('edStatus').textContent = msg; }
 let edTimer = 0;
 const edProg = TPEditor.create($('edProg'), { language: 'tp', counts: true, lint: true, label: 'TP program editor',
   onChange: text => { const e = programs[active]; if (!e) return; e.lines = text.split('\n'); e._prog = null; scheduleRun(); },
-  onCursor: line => jumpToLine(line) });
+  onLineClick: line => jumpToLine(line) });
 const edPos = TPEditor.create($('edPos'), { language: 'plain', label: 'Positions editor',
   onChange: text => { const e = programs[active]; if (!e) return; e.posText = text; e._prog = null; scheduleRun(); } });
 function scheduleRun() { clearTimeout(edTimer); edTimer = setTimeout(() => { programs.forEach(p => { if (p === programs[active]) p._prog = null; }); rerun(true); saveWorkspaceSoon(); updateEditedUI(); renderTabs(); }, 350); }
@@ -238,7 +238,7 @@ function jumpToLine(line) {
   let i = S.findIndex((sp, k) => k > currentStep() && match(sp));
   if (i < 0) i = S.findIndex(match);
   if (i < 0) { flash(`Line ${line} never runs with the current inputs and registers.`); return; }
-  flash('Line numbers are the TP line numbers. Edits re-run the simulation.');
+  flash('Click a line number to jump there. Edits re-run the simulation.');
   pinned = i; playing = false; updatePlay(); t = S[i].t; paperDirty = true; lastStepShown = -2;
 }
 

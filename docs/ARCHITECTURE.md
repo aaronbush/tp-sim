@@ -77,7 +77,7 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 - **`TPEditor.create(parent, opts)`.** It builds a CodeMirror 6 view. Its methods are `setText`, `getText`, `setExecLine(line, sub, scroll)`, `setCounts(counts, ran)`, `setDiagnostics(issues)`, `gotoLine`, `cursorLine`, `insertLineAfter` and `replaceLine`.
 - **Language.** A `StreamLanguage` with custom tags: J/L/C get their own colors matching the path colors, positions, I/O, terminations and options are tagged, and highlighting uses CSS variables.
 - **Gutters and decorations.** A run-count gutter, a dim decoration for lines that never ran, a line highlight for the executing line (lighter while inside a CALL), and the lint gutter, fed from `sim.issues` through `setDiagnostics`.
-- **Callbacks.** `opts.onChange` fires on user edits but not on `setText`. `opts.onCursor` fires only on pointer selection; that is how a click on a line jumps playback.
+- **Callbacks.** `opts.onChange` fires on user edits but not on `setText`. `opts.onLineClick` fires on a click in the line-number gutter; that is how playback jumps to a line. A click in the text only moves the cursor.
 - **Rebuilding the bundle.** `site/vendor/codemirror.min.js` is an esbuild IIFE exposing `window.CM`; `tools/codemirror/entry.js` lists its exports. To use another CodeMirror API, add it to `entry.js` and rebuild.
 
 ## app.js
@@ -98,7 +98,7 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 - **Playback.**
   - `t` is the time; `sampleAt(t)` gives the timeline sample.
   - `currentStep()` is the pinned step when stepping, otherwise `stepAt(t)`.
-  - `gotoStep()` and `jumpToLine()` handle line stepping and clicks on lines.
+  - `gotoStep()` and `jumpToLine()` handle line stepping and clicks on line numbers.
   - `frame()` runs the requestAnimationFrame loop. It updates the robot, the ink draw range and the paper view, and refreshes the readout every frame. The editor highlight and the state panel update only when the step changes.
 - **3D.** The scene is rebuilt per simulation by `buildScene()`. The robot is cylinders between FK points. Paths are colored by motion type, ink is revealed over time, and axes are drawn for World, every user frame used, and the tool. `poseRobot(q, tool)` positions the arm.
 - **Paper view.** A 2D canvas top-down view (+X up, +Y left), with bounds from points near the surface. It draws air moves dashed, a ghost of the full drawing, the ink drawn so far, and the tip.

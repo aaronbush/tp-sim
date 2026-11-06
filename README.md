@@ -35,7 +35,7 @@ It works with the `.ls` export format used by FANUC controllers. This project is
 - **Registers & I/O panel:** shows register, position register and output values at the current line; changed values are highlighted. Inside a called program it also shows the `AR[ ]` arguments it was given.
 - **Data screens:** **Registers** and **Position Reg** tabs work like the pendant's DATA screens. Set each `R[ ]` / `PR[ ]` once, with a comment, and every program starts from those values. An **After run** column shows what the last run left in each register, and **Keep after-run values** copies them in when you want them to stick. Rows the open program uses are highlighted; a • marks ones it reads before setting.
 - **Inputs:** you set `DI/RI/GI` values here, and can make an input flip after a few seconds so `WAIT DI[ ]=ON` releases.
-- **Stepping:** **◀ Line / Line ▶** steps one executed line at a time, through loops and calls. Clicking a line in the editor jumps to where it runs.
+- **Stepping:** **◀ Line / Line ▶** steps one executed line at a time, through loops and calls. Clicking a line number in the editor jumps to where that line runs; clicking the text only places the cursor.
 - **Teach mode:** press **Teach** to take the arm off playback and position it yourself, then record what you've set up.
   - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z**, Shift, or the height strip), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
   - **Record new point** adds a `P[n]` in the active user/tool frame and inserts an `L` or `J` move after the cursor line.
