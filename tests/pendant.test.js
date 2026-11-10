@@ -443,6 +443,7 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
   h.dm('held'); h.press('RESET'); h.press('FWD');
   h.tickUntil(() => h.st().runState === 'ABORTED');
   check('11 continuous run ends at P[3], ABORTED', atP(3) && h.st().runState === 'ABORTED');
+  check('11 running through [End] puts the cursor back on line 1', h.st().line === 1 && h.text().includes('[[   1:'), h.text());
   h.up('SHIFT');
   h.press('FCTN', 'D2');
   check('11 Disable FWD/BWD shows FBD and blocks SHIFT+FWD', h.st().fbd && (h.press('ITEM'), h.num(1), h.down('SHIFT'), h.press('FWD'), h.st().runState === 'ABORTED'));

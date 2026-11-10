@@ -193,6 +193,7 @@ Each of these is marked `// unverified:` in `site/js/controller.js`. Check them 
 
 - [run] FINE/VFINE override during a program run. — Treated as 1 %.
 - [run] If the cursor is moved while paused, SHIFT+FWD asks "Paused at line N. Run from line M instead?" (YES/NO); after YES, SHIFT+FWD again runs from the cursor line, and NO leaves the program paused — prompt wording and the NO behaviour are assumed.
+- [run] When a program runs through [End] the cursor goes back to line 1; FCTN ABORT (ALL) leaves it where it is. In STEP mode the last instruction leaves the program PAUSED on that line and the next SHIFT+FWD ends it — all from general knowledge, not the manual.
 - [select] Choosing a different program from SELECT puts its cursor on line 1 and lets go of the deadman (SRVO-003, so grip it again and RESET). The deadman release is a trainer safety choice the owner asked for, not real pendant behaviour; whether the real pendant always opens at line 1 is assumed.
 - [run] SHIFT+BWD only walks back along the paused run's own path (the reverse of the last move,
   ending at the previous point); it does nothing after a jog, an edit, or from ABORTED.

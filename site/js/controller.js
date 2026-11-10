@@ -789,6 +789,7 @@ const TPController = (() => {
         if (this.resim(sim.resume.prog, sim.resume.line, go, byTP)) this.run.root = root;
         return;
       }
+      if (sim.stopReason === 'end' && r.root) { const c = this.cursorOf(r.root); c.line = 1; c.col = 0; }   // unverified: running through [End] puts the cursor back on line 1
       this.run = { state: 'ABORTED' };
     }
     startBwd() {
