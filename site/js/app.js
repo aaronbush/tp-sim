@@ -35,6 +35,8 @@ const lsOf = e => toLS(parsedOf(e));
 function saveWorkspace() {
   store.set('ws', { active: programs[active] ? programs[active].name : null,
     programs: programs.map(e => ({ ls: toLS({ ...parsedOf(e), lines: e.lines }), origLines: e.origLines, origPos: e.origPos })) });
+  // Optional hook for host.js (VS Code webview): called after every workspace save. Unset in the plain site.
+  if (typeof window.onTPWorkspaceSaved === 'function') { try { window.onTPWorkspaceSaved(); } catch (e) {} }
 }
 let wsTimer = 0; const saveWorkspaceSoon = () => { clearTimeout(wsTimer); wsTimer = setTimeout(saveWorkspace, 600); };
 function addEntry(e, select) {
@@ -446,7 +448,7 @@ $('helpDlg').addEventListener('click', e => { if (e.target === $('helpDlg')) $('
 $('helpDlg').querySelector('.help-toc').addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); openHelp(a.getAttribute('href').slice(1)); });
 
 document.addEventListener('keydown', e => {
-  if (e.target.closest && e.target.closest('.cm-editor, input, textarea, select, button, dialog')) return;
+  if (e.target.closest && e.target.closest('.cm-editor, .tp-pendant, input, textarea, select, button, dialog')) return;
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.code === 'Space') { e.preventDefault(); $('playBtn').click(); }
   if (e.key === 'ArrowRight' && e.altKey) { e.preventDefault(); $('stepBtn').click(); }
@@ -464,6 +466,7 @@ const toolAt = (i) => { const sg = sim.segs[sim.T.seg[Math.min(i + 1, sim.T.seg.
 // ---------- 3D ----------
 let renderer = null, scene, camera, controls, robotParts = null, pathGroup = null, inkObj = null, tipMarker = null, toolAxes = null;
 let teachHook = null, teachTip = null; // set by teach.js
+let pendantHook = null; // set by pendant-app.js: { active(), frame(), setOn(bool) }
 const view = $('view3d');
 function init3D() {
   try {
@@ -726,9 +729,10 @@ function placeSide() {
 function setPane(p) {
   const teachOn = !!(teachHook && teachHook.active());
   if (phoneMQ.matches && (p === 'teach') !== teachOn) $('teachBtn').click();
+  if (phoneMQ.matches && pendantHook) pendantHook.setOn(p === 'pendant');
   document.body.dataset.pane = p;
   document.querySelectorAll('#phoneTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pane === p));
-  if (p !== 'teach') store.set('pane', p);
+  if (p !== 'teach' && p !== 'pendant') store.set('pane', p);
   if (p === 'program') requestAnimationFrame(() => edProg.view.requestMeasure());
   paperDirty = true; lastStepShown = -2;
   if (phoneMQ.matches) window.scrollTo(0, 0);
@@ -762,7 +766,8 @@ function renderReadout(si, q, p, f) {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  if (teachHook && teachHook.active()) teachHook.frame();
+  if (pendantHook && pendantHook.active()) pendantHook.frame();
+  else if (teachHook && teachHook.active()) teachHook.frame();
   else if (sim && sim.T.p.length) {
     if (playing) { t += dt * speed; if (t >= sim.total) { t = sim.total; playing = false; updatePlay(); } paperDirty = true; }
     const { i, f } = sampleAt(t), T = sim.T, j = Math.min(i + 1, T.p.length - 1);

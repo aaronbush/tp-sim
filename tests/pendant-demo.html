@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendant demo</title>
+<!-- Standalone page for the pendant face. Serve the repo root (e.g. python3 -m http.server) and open /tests/pendant-demo.html
+     (mock controller) or /tests/pendant-demo.html?real=1 (core.js + controller.js). -->
+<link rel="stylesheet" href="../site/css/app.css">
+<link rel="stylesheet" href="../site/css/pendant.css">
+<style>
+  body { padding-inline: 16px; }
+  .demo { max-width: 1000px; margin: 0 auto; display: grid; gap: 14px; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 860px) { .demo { grid-template-columns: minmax(0, 1fr); } }
+  .demo h1 { font: 700 22px var(--f-display); text-transform: uppercase; margin: 0; grid-column: 1 / -1; }
+  .side { display: grid; gap: 10px; font: 13px var(--f-mono); }
+  .side button { font: 600 13px var(--f-mono); padding: 6px 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 4px; cursor: pointer; }
+  #evlog { height: 260px; overflow: auto; border: 1px solid var(--line); background: var(--panel); padding: 6px; white-space: pre; font-size: 12px; }
+  .hint { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="demo">
+  <h1>Pendant demo <span class="hint" id="which"></span></h1>
+  <div id="pendant"></div>
+  <div class="side">
+    <div>
+      <button id="thLight">Light</button> <button id="thDark">Dark</button> <button id="thAuto">Auto</button>
+      <button id="latchBtn" aria-pressed="true">Latch: on</button>
+    </div>
+    <div class="hint">Click the pendant (or Tab to it) so it has focus, then use the keyboard. Events sent to the controller:</div>
+    <div id="evlog" aria-live="off"></div>
+  </div>
+</div>
+<script src="pendant-demo-mock.js"></script>
+<script src="../site/js/pendant.js"></script>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const load = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('cannot load ' + src)); document.head.appendChild(s); });
+  let ctl;
+  if (q.get('real') === '1') {
+    await load('../site/js/core.js'); await load('../site/js/controller.js');
+    // stub host with two programs from site/examples, in the app.js workspace shape
+    const progs = new Map();
+    for (const f of ['box_ab.ls', 'loop_squares.ls']) {
+      const sp = splitLS(await fetch('../site/examples/' + f).then(r => r.text()));
+      progs.set(sp.name.toUpperCase(), { name: sp.name.toUpperCase(), header: sp.header, lines: sp.mn, posText: sp.posText });
+    }
+    window.__progs = progs;
+    const copy = p => JSON.parse(JSON.stringify(p));
+    const host = { listPrograms: () => [...progs.keys()], getProgram: n => (progs.has(n) ? copy(progs.get(n)) : undefined), saveProgram: p => progs.set(p.name, copy(p)), deleteProgram: n => progs.delete(n),
+      settings: { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, macros: {}, rCmt: {}, prCmt: {}, comp: 3, tol: 1 }, settingsChanged() {} };
+    ctl = TPController.create(host);
+    document.getElementById('which').textContent = '(real controller)';
+  } else { ctl = PendantMock.create(); document.getElementById('which').textContent = '(mock controller)'; }
+  // every event the pendant sends (except ticks) is recorded for the smoke test and shown in the log
+  window.__events = [];
+  const log = document.getElementById('evlog');
+  const wrapped = { screen: () => ctl.screen(), switches: () => (ctl.switches ? ctl.switches() : null), robot: () => ctl.robot && ctl.robot(), subscribe: f => ctl.subscribe(f),
+    dispatch(e) { if (e.type !== 'tick') { window.__events.push(e); log.textContent += JSON.stringify(e) + '\n'; log.scrollTop = log.scrollHeight; } return ctl.dispatch(e); } };
+  let latch = true, handle = null;
+  const mount = () => { if (handle) handle.destroy(); handle = TPPendant.mount(document.getElementById('pendant'), wrapped, { latch }); window.__pendant = handle; };
+  mount();
+  const setTheme = t => { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); };
+  document.getElementById('thLight').onclick = () => setTheme('light');
+  document.getElementById('thDark').onclick = () => setTheme('dark');
+  document.getElementById('thAuto').onclick = () => setTheme(null);
+  const lb = document.getElementById('latchBtn');
+  lb.onclick = () => { latch = !latch; lb.setAttribute('aria-pressed', latch); lb.textContent = 'Latch: ' + (latch ? 'on' : 'off'); mount(); };
+  window.__ready = true;
+})().catch(e => { document.body.insertAdjacentHTML('beforeend', '<pre>' + e.message + '</pre>'); window.__error = e.message; });
+</script>
+</body>
+</html>

@@ -40,6 +40,12 @@ It works with the `.ls` export format used by FANUC controllers. This project is
   - Drag the yellow handle at the tool tip (X/Y, or Z with **Drag Z**, Shift, or the height strip), or jog with ± buttons in **Joint, World, User or Tool** coordinates, like the pendant's COORD key.
   - **Record new point** adds a `P[n]` in the active user/tool frame and inserts an `L` or `J` move after the cursor line.
   - **Touch up** replaces the point on the cursor line. It takes out the line's `Offset,PR[ ]` if there is one; on a `PR[ ]` line it sets that register's start value in **Position Reg** instead.
+- **Pendant mode** (the **Pendant** button under the 3D view, or the **Pendant** tab on a phone): an on-screen hard-key teach pendant for practising the real key sequences. The 3D arm follows it.
+  - **What it simulates:** the key layout and labels, the screen and function-key labels, power-up alarms, RESET, the ON/OFF switch, deadman and E-stops, T1/T2/AUTO, jogging (COORD, override, SHIFT + jog key), POSN, SELECT (create, copy, delete, open), EDIT (record points, touch up, edit motion fields, INST and EDCMD basics), DATA registers and position registers, digital I/O (view and simulate), and test runs (STEP, SHIFT+FWD / BWD, HOLD, abort).
+  - **How to use it:** click the pendant so it has focus and type; the **?** next to it lists every key. SHIFT and the deadman latch on click and stay lit until you click again. The deadman (on the back of a real pendant) and the mode switch, CYCLE START and panel E-stop (on the controller) are in a separate strip under the pendant.
+  - **Your programs:** a program you create or edit on the pendant appears as a tab and in the editor, and edits made in the editor show on the pendant. Use SELECT on the pendant to pick one; opening Pendant mode never selects a program for you.
+  - **Registers and inputs:** the pendant writes live register, position-register and simulated-input values into the same Data values the simulator starts from, and they are saved. After a pendant run, those start values are whatever the run left behind; the Data panel follows them, and the simulation refreshes when you leave Pendant mode.
+  - **Limits:** screens and keys the course notes don't cover say "Not available in the trainer" (for example most menus, MOVE MENU, GROUP and frame setup). No default-motion editing, Circle Arc, `FOR`, macros, `SKIP`, or Find / Replace / Renumber. SHIFT+BWD only walks back inside the paused run's path.
 - **Help:** the **?** button (or the <kbd>?</kbd> key) opens a short guide: getting started, teaching points, registers, program features, the 3D view and shortcuts. The **?** in teach mode opens it at the teach steps.
 - **Views:** the arm animates in 3D with World, user-frame and tool-frame axes. A top-down "paper" view shows what the tool draws, with a **height strip** beside it: the tool's height above the surface on a vertical scale, the crash limit, and each taught point's height. In teach mode, drag up or down in the strip to move the tool in Z.
 - **Phones:** on narrow screens the 3D view stays at the top and tabs at the bottom switch between **Run**, **Teach**, **Program**, **Data** and **More** (Findings, Paper, Settings). The height strip sits on the 3D view's edge, and Record / Touch up stay in reach while you jog. Buttons are larger on touch screens.
@@ -104,11 +110,12 @@ Then open http://localhost:8000. Opening `index.html` directly from disk won't l
 
 ```bash
 node tests/core.test.js
+node tests/pendant.test.js   # key-script tests for the pendant controller
 ```
 
 The tests run the interpreter against the example programs and a set of edge cases. GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs both test scripts on every pull request and push to `main`.
 
-`node tests/browser-smoke.js` loads the real page in headless Chromium at desktop and phone width; it needs Playwright. See [`CLAUDE.md`](CLAUDE.md) for contributor notes and [`docs/`](docs/) for architecture and the backlog.
+`node tests/pendant-ui-smoke.js` exercises the pendant face (mock and real controller, `tests/pendant-demo.html`). `node tests/browser-smoke.js` loads the real page in headless Chromium at desktop and phone width; it needs Playwright. See [`CLAUDE.md`](CLAUDE.md) for contributor notes and [`docs/`](docs/) for architecture and the backlog.
 
 ## Layout
 
@@ -116,6 +123,7 @@ The tests run the interpreter against the example programs and a set of edge cas
 - `site/js/editor.js`: CodeMirror setup, including the TP language, suggestions, run counts and the executing-line highlight.
 - `site/js/app.js`: page wiring, the 3D view, the paper view and the panels.
 - `site/js/teach.js`: teach mode (drag, jog, record and touch up).
+- `site/js/controller.js`: the live pendant controller (no DOM); `site/js/pendant.js` and `site/css/pendant.css`: the on-screen pendant; `site/js/pendant-app.js`: Pendant mode in the page. Design in [`docs/PENDANT.md`](docs/PENDANT.md).
 - `site/vendor/`: three.js r128, and a CodeMirror 6 bundle built from [`tools/codemirror`](tools/codemirror) (`npm install && npm run build`).
 
 ## Deployment

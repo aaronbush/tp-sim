@@ -1,0 +1,48 @@
+{
+  "name": "TP program",
+  "scopeName": "source.tp-ls",
+  "patterns": [
+    { "include": "#section" },
+    { "include": "#comment" },
+    { "include": "#lineno" },
+    { "include": "#motion" },
+    { "include": "#keyword" },
+    { "include": "#ref" },
+    { "include": "#number" },
+    { "include": "#string" }
+  ],
+  "repository": {
+    "section": {
+      "match": "^\\s*/(PROG|ATTR|APPL|MN|POS|END|LN_NAME|MIXED)\\b",
+      "name": "markup.heading.section.tp-ls"
+    },
+    "comment": {
+      "patterns": [
+        { "match": "//.*$", "name": "comment.line.double-slash.tp-ls" },
+        { "match": "!.*?(?=;\\s*$|$)", "name": "comment.line.exclamation.tp-ls" }
+      ]
+    },
+    "lineno": {
+      "match": "^\\s*\\d+:",
+      "name": "constant.numeric.lineno.tp-ls"
+    },
+    "motion": {
+      "match": "(?<![A-Za-z0-9_\\[])[JLC](?=\\s+(?:P|PR)\\[)",
+      "name": "keyword.control.motion.tp-ls"
+    },
+    "keyword": {
+      "patterns": [
+        { "match": "\\b(?:LBL|JMP|CALL|IF|THEN|ELSE|ENDIF|WAIT|FOR|ENDFOR|SELECT|TIMEOUT|PAUSE|ABORT|END|DOWNTO|TO|DO)\\b", "name": "keyword.control.flow.tp-ls" },
+        { "match": "\\b(?:UFRAME_NUM|UTOOL_NUM|OFFSET|Offset|CONDITION|Tool_Offset|PAYLOAD|OVERRIDE|TB|TA|DB|COORD|ACC|RT_LD|LPOS|JPOS|CNT|FINE|mm/sec|deg/sec|cm/min|sec|msec)\\b", "name": "support.constant.tp-ls" }
+      ]
+    },
+    "ref": {
+      "patterns": [
+        { "match": "\\b(?:P|PR|R|SR|AR|GP|GI|GO|DI|DO|RI|RO|SI|SO|UI|UO|AI|AO|F|M|TIMER|TIMER_OVERFLOW|UFRAME|UTOOL)(?=\\[)", "name": "variable.other.register.tp-ls" },
+        { "match": "\\b(?:ON|OFF)\\b", "name": "constant.language.tp-ls" }
+      ]
+    },
+    "number": { "match": "(?<![A-Za-z_])-?\\d+(?:\\.\\d+)?", "name": "constant.numeric.tp-ls" },
+    "string": { "match": "'[^']*'", "name": "string.quoted.single.tp-ls" }
+  }
+}

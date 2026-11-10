@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/pendant.css">
 </head>
 <body>
 <div class="wrap">
@@ -51,6 +52,7 @@
           <button type="button" data-s="0.25">¼×</button><button type="button" data-s="0.5">½×</button><button type="button" data-s="1" aria-pressed="true">1×</button><button type="button" data-s="2">2×</button><button type="button" data-s="4">4×</button>
         </div>
         <button class="btn teachbtn" id="teachBtn" type="button" aria-pressed="false" title="Jog the robot and record points">Teach</button>
+        <button class="btn teachbtn" id="pendantBtn" type="button" aria-pressed="false" title="Use the on-screen teach pendant">Pendant</button>
       </div>
       <div class="jogbar" id="jogbar" data-pane="teach" hidden>
         <div class="jrow">
@@ -83,6 +85,11 @@
         <label><input type="checkbox" id="showGhost" checked> full drawing</label>
         <span id="gridNote">grid 10 mm</span>
       </div>
+    </section>
+
+    <section class="panel" id="pendantPanel" data-pane="pendant" hidden>
+      <div class="panel-h"><h2>Teach pendant</h2><span class="sub">click it, then use the keyboard</span><button class="btn helpbtn" type="button" data-help="help-pendant" aria-label="How the pendant works" title="How the pendant works">?</button></div>
+      <div class="pendant-mount" id="pendantMount"></div>
     </section>
   </div>
 
@@ -165,13 +172,14 @@
   <button type="button" data-pane="teach" aria-pressed="false">Teach</button>
   <button type="button" data-pane="program" aria-pressed="false">Program</button>
   <button type="button" data-pane="data" aria-pressed="false">Data</button>
+  <button type="button" data-pane="pendant" aria-pressed="false">Pendant</button>
   <button type="button" data-pane="more" aria-pressed="false">More<span class="badge-n" id="tabBadge" hidden></span></button>
 </nav>
 
 <dialog id="helpDlg" aria-labelledby="helpTitle">
   <div class="help-h"><h2 id="helpTitle">How to use this</h2><button class="btn" type="button" id="helpClose" aria-label="Close help">Close</button></div>
   <div class="help-b">
-    <nav class="help-toc" aria-label="Help topics"><a href="#help-start">Start</a><a href="#help-teach">Teach a point</a><a href="#help-data">Registers</a><a href="#help-prog">Program features</a><a href="#help-view">3D view</a><a href="#help-keys">Shortcuts</a></nav>
+    <nav class="help-toc" aria-label="Help topics"><a href="#help-start">Start</a><a href="#help-teach">Teach a point</a><a href="#help-data">Registers</a><a href="#help-prog">Program features</a><a href="#help-pendant">Pendant</a><a href="#help-view">3D view</a><a href="#help-keys">Shortcuts</a></nav>
 
     <section id="help-start"><h3>Start</h3><ol>
       <li>Pick a program tab, load one from <b>Examples…</b>, press <b>New</b> for a blank program, or <b>Open .ls…</b> to load your own.</li>
@@ -209,6 +217,16 @@
       <li>Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> in the editor for instruction suggestions. Point data is on the <b>Positions</b> tab. <b>Download .ls</b> saves the file.</li>
     </ul></section>
 
+    <section id="help-pendant"><h3>Pendant mode</h3><ol>
+      <li>Press <b>Pendant</b> (under the 3D view; on a phone, the <b>Pendant</b> tab). The 3D arm now follows the on-screen pendant. Click the pendant, or Tab to it, so the keyboard works.</li>
+      <li>Like the real unit: turn the <b>ON/OFF</b> switch on, hold the <b>deadman</b> (it is on the back of a real pendant, so it sits in the strip under the pendant), then press <b>RESET</b>. To jog, hold <b>SHIFT</b> and a jog key.</li>
+      <li><b>SHIFT</b> and the <b>deadman</b> latch when you click or tap them and stay lit until you click again, so one mouse can hold both. Several keys held at once work on touch screens. Jog keys, FWD and BWD act only while held.</li>
+      <li>The <b>T1/T2/AUTO</b> mode switch, <b>CYCLE START</b> and the panel <b>E-stop</b> are on the controller cabinet, so they are in the strip under the pendant too; the pendant <b>E-stop</b> is on its face.</li>
+      <li>Screens the course notes don't cover say "Not available in the trainer". Programs you create or edit on the pendant show up as tabs and in the editor, and the other way round.</li>
+    </ol>
+    <p>Keyboard (works while the pendant has focus; Shift and Space are held keys):</p>
+    <div class="pkeys" id="pendantKeys"></div></section>
+
     <section id="help-view"><h3>3D view</h3><ul>
       <li>Drag empty space to spin the view; scroll or pinch to zoom; right-drag (two fingers on touch) to pan.</li>
       <li>The <b>height strip</b> shows the tool's height above the surface: the red dashed line is the crash limit, dots are taught point heights, and the scale above <code>//</code> is squeezed so tall moves don't flatten the working zone. It sits beside the Paper view, or on the 3D view's edge on a phone.</li>
@@ -231,8 +249,12 @@
 <script src="vendor/OrbitControls.js"></script>
 <script src="vendor/codemirror.min.js"></script>
 <script src="js/core.js"></script>
+<script src="js/controller.js"></script>
+<script src="js/pendant.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/app.js"></script>
 <script src="js/teach.js"></script>
+<script src="js/pendant-app.js"></script>
+<script src="js/host.js"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@ let fails = 0;
 const check = (name, ok, extra) => { console.log((ok ? 'ok   ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); if (!ok) fails++; };
 server.listen(0, async () => {
   const url = `http://localhost:${server.address().port}/`;
-  const browser = await pw.chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+  const browser = await pw.chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'], ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}) });
   for (const [w, h, scheme] of [[1360, 1500, 'light'], [420, 900, 'dark']]) {
     const page = await browser.newPage({ viewport: { width: w, height: h }, colorScheme: scheme });
     const errs = [];
@@ -99,6 +99,29 @@ server.listen(0, async () => {
     await page.keyboard.press('Escape'); await page.waitForTimeout(150);
     if (shots && phone) await page.screenshot({ path: path.join(shots, `phone-teach-${scheme}.png`) });
     await teach(false);
+    // pendant mode: enable, deadman, reset, SHIFT + jog key moves the 3D arm
+    if (phone) await pane('pendant'); else await page.click('#pendantBtn');
+    await page.waitForTimeout(400);
+    check(`${w}px: pendant mode shows the pendant`, await page.isVisible('#pendantMount .tp-face') && await page.isVisible('#pendantMount .tp-screen'));
+    check(`${w}px: pendant screen fits 60 columns without clipping`, await page.evaluate(() => { const r = [...document.querySelectorAll('#pendantMount .tp-body .row')]; return r.length === 12 && r.every(x => x.scrollWidth <= x.clientWidth + 1); }));
+    const tip = () => page.evaluate(() => tipMarker.position.toArray());
+    await page.click('#pendantMount [data-ctl="tpenable"]'); await page.click('#pendantMount [data-ctl="deadman"]'); await page.click('#pendantMount [data-key="RESET"]');
+    await page.waitForTimeout(100);
+    const tip0 = await tip();
+    await page.click('#pendantMount [data-key="SHIFT"]');
+    await page.evaluate(() => scrollTo(0, 250)); await page.waitForTimeout(100);   // keep the key clear of the pinned 3D view and the tab bar
+    const jb = await page.locator('#pendantMount [data-key="J1_POS"]').boundingBox();
+    await page.mouse.move(jb.x + jb.width / 2, jb.y + jb.height / 2); await page.mouse.down(); await page.waitForTimeout(1200); await page.mouse.up(); await page.waitForTimeout(150);
+    const tip1 = await tip();
+    check(`${w}px: pendant jog moves the 3D arm`, tip0.some((v, k) => Math.abs(v - tip1[k]) > 0.5), tip0.map(Math.round) + ' -> ' + tip1.map(Math.round));
+    check(`${w}px: pendant readout in 3D view`, /PENDANT/.test(await page.textContent('#readout')));
+    check(`${w}px: pendant mode has no horizontal scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `pendant-mode-${w}-${scheme}.png`), fullPage: true }); }
+    await page.click('#pendantMount [data-key="SHIFT"]'); await page.click('#pendantMount [data-ctl="deadman"]');
+    if (phone) await pane('run'); else await page.click('#pendantBtn');
+    await page.waitForTimeout(300);
+    check(`${w}px: leaving pendant mode restores the app`, !(await page.isVisible('#pendantMount')) && !(await page.isDisabled('#playBtn')));
     await page.click('#helpBtn'); await page.waitForTimeout(150);
     const opened = await page.evaluate(() => document.getElementById('helpDlg').open);
     await page.click('#helpClose');

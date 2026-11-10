@@ -11,6 +11,16 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
 - **Phone follow-up:** pendant-style insert buttons in the Program tab (J/L move, `R[ ]=`, `IF`, `WAIT`, `CALL`, `LBL`/`JMP`) so writing a program doesn't need `[ ] = :` from the phone keyboard. Also test on a real iPhone/iPad (Safari's `dvh`, safe-area insets, dragging the handle with a finger).
 - **Data screen ideas:** I/O comments (DI/DO) in a third tab, and register comments in editor suggestions.
 
+## Pendant trainer (see docs/PENDANT.md)
+
+In the app as Pendant mode. Known limits:
+
+- **SHIFT+BWD** only walks back within the paused run's path.
+- **Re-simulation inside a CALLed program** (after an edit, I/O change or WAIT) doesn't return to the caller.
+- **Not available:** editing the default motion instructions, Circle Arc, `FOR`/`ENDFOR`, macros, `SKIP`, Find, Replace and Renumber; frame setup (three-point method); most menu entries (they show "Not available in the trainer").
+- **Start values.** Live register / PR / input values written by the pendant are the same values the simulator starts from; there is no separate pendant state yet.
+- **Pendant UI:** the third key of the numeric block is a half-key pair (`,` and `-`) because the two scans disagree; the left SHIFT is the one `data-key="SHIFT"`. The software keyboard is the physical keyboard (no on-screen keyboard). Controller cabinet keys have no keyboard shortcuts. Test on real touch hardware.
+
 ## Needs verification
 
 - **Exported `.ls` on a real controller.** `toLS()` follows the format of the owner's exported files, but nobody has loaded a downloaded file on a controller yet. Watch especially for line spacing, `C` continuation lines, options on one line versus a `:` continuation, the header fields `PROG_SIZE`/`MEMORY_SIZE`, and the CONFIG string. Loading also needs the controller's ASCII program loader option.

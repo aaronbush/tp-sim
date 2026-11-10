@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: 20
       - run: node tests/core.test.js
+      - run: node tests/pendant.test.js
 
   browser:
     name: Browser smoke test
@@ -38,6 +39,8 @@ jobs:
           npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
       - name: Run smoke test
         run: PLAYWRIGHT_PATH="$RUNNER_TEMP/pw/node_modules/playwright" node tests/browser-smoke.js --shots "$RUNNER_TEMP/shots"
+      - name: Run pendant UI smoke test
+        run: PLAYWRIGHT_PATH="$RUNNER_TEMP/pw/node_modules/playwright" node tests/pendant-ui-smoke.js --shots "$RUNNER_TEMP/shots"
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
