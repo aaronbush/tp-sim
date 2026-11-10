@@ -455,6 +455,8 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
   h.down('SHIFT'); h.press('FWD'); h.tick(100, 2); h.up('SHIFT');
   check('11 WAIT time paused by SHIFT release', h.st().runState === 'PAUSED' && h.st().program === 'AA');
   h.press('SELECT'); h.c.top().row = h.c.top().list().indexOf('BB'); h.press('ENTER');
+  check('11 choosing another program lets go of the deadman', h.c.switches().deadman === 'released' && h.st().alarm === 'SRVO-003 Deadman switch released');
+  h.dm('held'); h.press('RESET');
   h.down('SHIFT'); h.press('FWD'); h.up('SHIFT');
   check('11 starting another program while one is paused: INTP-105 / PROG-040', h.st().alarm === 'INTP-105 (BB, 1) Run request failed' && h.c.alarms.some(a => a.text === 'PROG-040 Already locked by other task'));
   h.press('FCTN', 'D1', 'RESET'); h.down('SHIFT'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
@@ -474,7 +476,7 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
 // box_ab continuous to the end; final pose matches core runSim
 { const h = rig(['box_ab.ls']).ready();
   h.mode('T2'); h.press('RESET'); for (let i = 0; i < 4; i++) h.press('SHIFT+SPEED_UP');
-  h.press('SELECT', 'ENTER');
+  h.press('SELECT', 'ENTER'); h.dm('held'); h.press('RESET');   // choosing a program lets go of the deadman
   check('11 box_ab opened from SELECT', h.has('== BOX_AB  1/10') && h.has('J  PR[4:HOME_AB] 100% FINE'));
   h.down('SHIFT'); h.press('FWD');
   let lines = new Set(); const ok = h.tickUntil(() => { lines.add(h.st().line); return h.st().runState === 'ABORTED'; }, 50, 20000);
@@ -520,5 +522,23 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
 { const h = rig(); const s = h.ctl.screen();
   check('screen body is always ROWS x COLS', s.body.length === TP.ROWS && s.body.every(r => r.reduce((n, sg) => n + sg.text.length, 0) === TP.COLS) && s.softkeys.length === 5); }
 
+// Choosing another program starts it at line 1; moving the cursor while paused asks before running from there
+{ const h = rig().ready();
+  progHost(h, 'AA', ['R[1]=1', 'WAIT 1.00(sec)', 'R[1]=R[1]+1', 'R[3]=7']); progHost(h, 'BB', ['R[2]=2', 'R[2]=3']);
+  h.c.selectProgram('BB'); h.c.cursorOf('BB').line = 2;
+  h.press('SELECT'); h.c.top().row = h.c.top().list().indexOf('AA'); h.press('ENTER');
+  h.press('SELECT'); h.c.top().row = h.c.top().list().indexOf('BB'); h.press('ENTER');
+  check('5 switching to another program puts the cursor on line 1', h.c.cursorOf('BB').line === 1);
+  h.press('SELECT'); h.c.top().row = h.c.top().list().indexOf('AA'); h.press('ENTER');
+  h.dm('held'); h.press('RESET');
+  h.down('SHIFT'); h.press('FWD'); h.tick(100, 3); h.up('SHIFT');
+  check('11 paused in the WAIT on line 2', h.st().runState === 'PAUSED' && h.st().line === 2);
+  h.press('DOWN', 'DOWN');
+  h.down('SHIFT'); h.press('FWD'); h.tick(100, 2);
+  check('11 SHIFT+FWD from a moved cursor asks first', h.st().runState === 'PAUSED' && /Run from line 4 instead?/.test(h.text()) && !h.host.settings.r[3]);
+  h.press('F5'); h.press('FWD'); 
+  check('11 NO leaves it paused and asks again next time', h.st().runState === 'PAUSED' && /Run from line 4 instead?/.test(h.text()));
+  h.press('F4'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
+  check('11 YES then SHIFT+FWD runs from the cursor line', h.host.settings.r[3] === 7 && h.host.settings.r[1] === 1); }
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

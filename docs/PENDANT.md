@@ -192,7 +192,8 @@ Each of these is marked `// unverified:` in `site/js/controller.js`. Check them 
 **Program running**
 
 - [run] FINE/VFINE override during a program run. — Treated as 1 %.
-- [run] If the cursor is moved while paused, SHIFT+FWD starts from the cursor line.
+- [run] If the cursor is moved while paused, SHIFT+FWD asks "Paused at line N. Run from line M instead?" (YES/NO); after YES, SHIFT+FWD again runs from the cursor line, and NO leaves the program paused — prompt wording and the NO behaviour are assumed.
+- [select] Choosing a different program from SELECT puts its cursor on line 1 and lets go of the deadman (SRVO-003, so grip it again and RESET). The deadman release is a trainer safety choice the owner asked for, not real pendant behaviour; whether the real pendant always opens at line 1 is assumed.
 - [run] SHIFT+BWD only walks back along the paused run's own path (the reverse of the last move,
   ending at the previous point); it does nothing after a jog, an edit, or from ABORTED.
 - [run] Resuming after a change (edit, register, I/O, jog, STEP toggle) re-simulates from the

@@ -585,6 +585,12 @@ const TPController = (() => {
       return v6.slice(0, 3).every((v, i) => Math.abs(v - pr.v[i]) < 0.1);
     }
     selectProgram(name) { this.selected = name; }
+    // Choosing a different program on the pendant: start at line 1, and let go of the deadman so the
+    // student has to grip it again on purpose before anything moves.
+    switchProgram(name) {
+      if (name !== this.selected) { this.cursorOf(name).line = 1; this.cursorOf(name).col = 0; this.setDeadman('released'); }   // unverified: trainer safety choice, not pendant behaviour
+      this.selectProgram(name);
+    }
 
     // ----- registers / I/O -----
     inputsLive() {
@@ -647,7 +653,14 @@ const TPController = (() => {
         }
         let at = this.resumePoint();
         const cur = this.cursorOf(this.execProg || r.root);
-        if (r.cursorMoved && cur) { at = { prog: this.execProg || r.root, line: cur.line }; r.dirty = true; }   // unverified: start from the moved cursor line
+        if (r.cursorMoved && cur && at && cur.line === at.line) r.cursorMoved = false;   // moved away and back: nothing to confirm
+        if (r.cursorMoved && cur) {
+          if (!r.cursorOK) {   // unverified: prompt wording, and that NO leaves everything as it was
+            this.ask(`Paused at line ${at ? at.line : '?'}. Run from line ${cur.line} instead?`, () => { if (this.run === r) r.cursorOK = true; this.msg = 'Press SHIFT+FWD to run from the cursor line'; });
+            return;
+          }
+          at = { prog: this.execProg || r.root, line: cur.line }; r.dirty = true;
+        }
         if (!at) { this.abortAll(); return; }
         if (r.dirty) { if (!this.resim(at.prog, at.line, mode, byTP)) return; }
         else { r.state = 'RUNNING'; r.held = false; r.cursorMoved = false; }
@@ -961,7 +974,7 @@ const TPController = (() => {
       const c = this.ctl, L = this.list(), name = L[this.row];
       if (k === 'UP') this.row = Math.max(0, this.row - 1);
       else if (k === 'DOWN') this.row = Math.min(L.length - 1, this.row + 1);
-      else if (k === 'ENTER' && name) { c.selectProgram(name); c.open(new EditScreen(c, name)); }
+      else if (k === 'ENTER' && name) { c.switchProgram(name); c.open(new EditScreen(c, name)); }
       else if (/^F[1-5]$/.test(k)) {
         const lab = this.softkeys()[+k[1] - 1];
         if (lab === 'CREATE') c.open(new CreateScreen(c, 'create'));
@@ -1040,7 +1053,7 @@ const TPController = (() => {
       const c = this.ctl;
       if (k === 'UP') this.row = Math.max(0, this.row - 1);
       else if (k === 'DOWN') this.row = Math.min(7, this.row + 1);
-      else if (k === 'F1') { if (c.loadProg(this.name)) { c.selectProgram(this.name); c.open(new EditScreen(c, this.name)); } }
+      else if (k === 'F1') { if (c.loadProg(this.name)) { c.switchProgram(this.name); c.open(new EditScreen(c, this.name)); } }
       else if (k === 'F2' || k === 'F3') {
         const L = (c.host.listPrograms ? c.host.listPrograms() : []).slice().sort(), i = L.indexOf(this.name);
         const j = clamp(i + (k === 'F2' ? -1 : 1), 0, L.length - 1); if (L[j]) this.name = L[j];
@@ -1178,7 +1191,7 @@ const TPController = (() => {
     moveLine(d) {
       const e = this.ed, cur = this.cur, n = e.lines.length;
       const nl = clamp(cur.line + d, 1, n + 1);
-      if (nl !== cur.line) { cur.line = nl; if (this.ctl.run.state === 'PAUSED' && this.ctl.execProg === this.name) this.ctl.run.cursorMoved = true; }
+      if (nl !== cur.line) { cur.line = nl; if (this.ctl.run.state === 'PAUSED' && this.ctl.execProg === this.name) { this.ctl.run.cursorMoved = true; this.ctl.run.cursorOK = false; } }
     }
     selKey(k) { if (k === 'UP' || k === 'DOWN') { this.moveLine(k === 'UP' ? -1 : 1); return true; } return false; }
     key(k, shift) {

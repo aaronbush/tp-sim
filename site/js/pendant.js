@@ -291,7 +291,12 @@ const TPPendant = (() => {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { ratio = 0; fit(); });
     fit();
 
-    const unsub = controller.subscribe ? controller.subscribe(render) : null;
+    // The controller can let go of the deadman itself (it does when another program is chosen): drop our latch to match, sending nothing.
+    function syncDeadman() {
+      const sw = controller.switches ? controller.switches() : null;
+      if (sw && sw.deadman === 'released' && isOn('DEADMAN')) { holds.get('DEADMAN').clear(); paint('DEADMAN'); }
+    }
+    const unsub = controller.subscribe ? controller.subscribe(() => { syncDeadman(); render(); }) : null;
     render();
     const sws = controller.switches ? controller.switches() : null;
     if (sws) {

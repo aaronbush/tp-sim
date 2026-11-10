@@ -217,6 +217,8 @@ server.listen(0, async () => {
     await key('SELECT'); for (let i = 0; i < 4; i++) await key('UP');
     await key('ENTER'); await page.waitForTimeout(50);
     check(`${tag}: BOX_AB opened from SELECT`, (await title()) === 'BOX_AB', await title());
+    check(`${tag}: choosing another program unlatches the deadman`, (await page.getAttribute('[data-ctl="deadman"]', 'aria-pressed')) === 'false');
+    await page.click('[data-ctl="deadman"]'); await key('RESET');
     await key('STEP');
     check(`${tag}: STEP lights the Step lamp`, (await page.locator('.tp-ind [data-ind="step"].on').count()) === 1);
     const fb = await page.locator('[data-key="FWD"]').boundingBox();
