@@ -139,7 +139,15 @@ name entry is open the `popup` is the `Alpha input 1` list. Only `'cursor'` is u
 - **Running by hand.** MENU > MANUAL FCTNS lists the MF macros; SHIFT+EXEC (F3) runs one. Teach-pendant keys: TOOL 1, TOOL 2, MOVE MENU, SETUP, STATUS, I/O, POSN are user keys 1-7; pressed alone they run the UK macro (it may not move the robot), with SHIFT the SU macro. A macro runs through the same machinery as SHIFT+FWD: TP on, T1/T2, deadman (SRVO-003 otherwise), no fault. A UK macro needs no SHIFT or deadman once started.
 - **Not built:** macros fired by DI/RI/UI/SOP inputs (the assignment is stored only), FLAG/MARKER assignment types, system macros.
 
-Later: frame setup (three-point method), AUTO-mode production start details, lessons with hints.
+## Frames (manual ch. 10, image pages p129-p176)
+
+- **Tables.** `settings.tools`, `settings.uframes` and the new `settings.jframes` are `{ n: [x, y, z, w, p, r] }` (jog frames default to `{}`; an untaught one is World). Comments are `settings.toolCmt`, `ufCmt`, `jfCmt`. The controller calls `host.settingsChanged()` after each change and pendant-app.js re-runs when the tables change.
+- **SETUP > Frames.** List screens for Tool (10), User (9) and Jog (5) frames with X Y Z and comment. F2 DETAIL or ENTER opens a frame, F3 [OTHER] switches the type, F4 CLEAR, F5 SETIND (frame number, then ENTER) sets the active Tool / User / Jog frame, the same numbers the SHIFT+COORD jog menu shows. The Active TOOL / UFRAME / JOG FRAME lines are as the figures show them.
+- **Detail.** F2 [METHOD] pop-up. Direct Entry: comment, then X Y Z W P R typed and ENTER. Point methods list their rows as UNINIT, RECORDED, then USED once the frame is computed; SHIFT+F5 RECORD takes the cursor row from the current pose (TP on), SHIFT+F4 MOVE_TO drives to it.
+- **Methods built.** Tool: Three Point, Four Point (mean / max error and worst point), Six Point (XZ) and (XY), Direct Entry. User: Three Point, Four Point, Direct Entry. Jog: Three Point, Direct Entry. Tool Two Point + Z shows "Not available in the trainer" (the manual doesn't cover it). Saving frame data to a device is not built.
+- **Maths.** User / jog: origin = first point, X toward the second, Z = X x (third - first), Y = Z x X; Four Point moves the origin to the System Origin point. Tool: the TCP offset t (in the flange frame) that minimises the spread of R_i t + p_i over the recorded flange poses; W P R stay 0 for Three / Four Point. Six Point takes the orientation from the directions the TCP moves from the orient origin pose.
+
+Later: AUTO-mode production start details, lessons with hints.
 
 ## Input ergonomics
 
@@ -191,7 +199,7 @@ Each of these is marked `// unverified:` in `site/js/controller.js`. Check them 
 
 - [jog] Jog speeds at 100 %. — 250 mm/s linear, 30 °/s rotation and joint, scaled by the override;
   FINE/VFINE move one increment per press (0.1 mm / 0.01°, and 0.01 mm / 0.001°).
-- [jog] Jog frames (JGFRM) are not set up anywhere in the app. — Jog frame n defaults to World.
+- [jog] An untaught jog frame. — It is World (all zeros).
 - [jog] No joint limits in the arm model, so joint jogging never alarms (only Cartesian reach does).
 - [posn] Joint signs and zero positions are the simulator arm's (see ARCHITECTURE), not the real
   arm's; J2/J3 Interaction is shown as J2+J3 (matches the p081 figure's numbers).
@@ -246,6 +254,18 @@ Each of these is marked `// unverified:` in `site/js/controller.js`. Check them 
 - [pendant UI] The scans disagree on the third key of the `0 .` row (comma on p059/p060, minus on p187) and on
   the bottom-left key (minus vs DIAG/HELP). The face follows p187 and splits that cell into `,` and `-` half keys.
 - [pendant UI] The status-bar "FBD" marker is drawn in the screen's title bar, not literally at the top-left.
+
+**Frames**
+
+- [frames] CLEAR confirmation text ("Clear tool frame n?", YES/NO) is not in the manual, nor whether CLEAR empties the comment. — Asked with YES/NO; clears values and comment.
+- [frames] SETIND prompt text ("Enter frame number") and the range message. — Assumed; ranges tool 1-10, user 0-9, jog 1-5 (the manual gives the counts: ten tool, nine user, five jog).
+- [frames] The tool list has ten rows and no room for the Active line. — It goes on the prompt line for tool frames and is the last row for user and jog frames.
+- [frames] The "/ Direct Entry" label on the list and the F3 FRAME key on the detail screen. — The list shows the method last chosen for that row since power-up; F3 FRAME asks for another frame number.
+- [frames] The word between UNINIT and USED, and the message for points that can't make a frame. — RECORDED and "Invalid points", the frame left as it was. Refused: user / jog points less than 1 mm apart or within about 1 degree of a line; tool orientations less than 2 degrees apart or all turned about one axis.
+- [frames] Orientation of Three / Four Point tool frames, and how Six Point turns its direction points into W P R. — W P R = 0 for Three / Four Point. Six Point reads the X and Z (or Y) directions from where the TCP moved from the orient origin pose and expresses them in the flange frame.
+- [frames] The user and jog [METHOD] list order, and the list screens' F1 [TYPE]. — As the chapter names the methods; F1 shows "Not available".
+- [frames] Which tool's tip user / jog points record. — The active Tool number at the time of RECORD.
+- [frames] Recorded points are kept per frame and method until power-up. — Reopening a frame shows its points as RECORDED / USED again.
 
 **Macros**
 

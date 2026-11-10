@@ -21,6 +21,12 @@ const TPController = (() => {
   const JOG_LIN = 250, JOG_ROT = 30, JOG_JOINT = 30;             // unverified: jog rates at 100% (mm/s, deg/s)
   const INC = { FINE: { lin: 0.1, ang: 0.01 }, VFINE: { lin: 0.01, ang: 0.001 } };   // unverified: incremental jog steps
   const NA = 'Not available in the trainer';
+  // SETUP > Frames (manual ch. 10, p134-p176): tool frames 1-10, user frames 1-9 (UF 0 is World), jog frames 1-5
+  const FRAME_TYPES = {
+    TOOL: { label: 'Tool Frame', count: 10, min: 1, cmt: 'toolCmt', active: v => `Active TOOL $MNUTOOLNUM[1] = ${v}` },
+    USER: { label: 'User Frame', count: 9, min: 0, cmt: 'ufCmt', active: v => `Active UFRAME $MNUFRAMENUM[1] = ${v}` },
+    JOG: { label: 'Jog Frame', count: 5, min: 1, cmt: 'jfCmt', active: v => `Active JOG FRAME[1] = ${v}` }
+  };
   const DEFAULT_MOTIONS = ['J P[] 100% FINE', 'J P[] 100% CNT100', 'L P[] 100mm/sec FINE', 'L P[] 100mm/sec CNT100'];
   const DIGIT = { D0: '0', D1: '1', D2: '2', D3: '3', D4: '4', D5: '5', D6: '6', D7: '7', D8: '8', D9: '9', DOT: '.', MINUS: '-', COMMA: ',' };
   const JOGKEY = /^J([1-8])_(NEG|POS)$/;
@@ -223,7 +229,7 @@ const TPController = (() => {
     }
     get settings() {
       const s = this.host.settings || (this.host.settings = {});
-      if (!s.r) s.r = {}; if (!s.pr) s.pr = {}; if (!s.inputs) s.inputs = {}; if (!s.macros) s.macros = {}; if (!s.macroAssign) s.macroAssign = {};
+      if (!s.r) s.r = {}; if (!s.pr) s.pr = {}; if (!s.inputs) s.inputs = {}; if (!s.macros) s.macros = {}; if (!s.macroAssign) s.macroAssign = {}; if (!s.jframes) s.jframes = {};
       return s;
     }
     powerUp() {
@@ -232,7 +238,7 @@ const TPController = (() => {
       this.shift = false; this.down = new Set();
       this.alarms = []; this.hist = [];
       this.coord = 'JOINT'; this.speedIdx = SPEEDS.indexOf(10);   // manual figure after power-up: JOINT, 10 %
-      this.q = this.q || C.HOME.slice(); this.uf = 0; this.ut = 1; this.jf = 1;
+      this.q = this.q || C.HOME.slice(); this.uf = 0; this.ut = 1; this.jf = 1; this.fmeth = {}; this.fpts = {}; this.frameType = 'TOOL';
       this.stepMode = false; this.fbd = false;
       this.selected = null; this.cursors = {};
       this.run = { state: 'ABORTED' }; this.execProg = null; this.execLine = 0;
@@ -296,6 +302,14 @@ const TPController = (() => {
     toolVec(n) { const t = (this.settings.tools || {})[n]; return t || (n === 1 ? [0, 0, 100, 0, 0, 0] : [0, 0, 0, 0, 0, 0]); }
     tool(n) { const v = this.toolVec(n == null ? this.ut : n); return { p: v.slice(0, 3), R: C.wprToR(v[3], v[4], v[5]) }; }
     ufVec(n) { return n ? ((this.settings.uframes || {})[n] || [0, 0, 0, 0, 0, 0]) : [0, 0, 0, 0, 0, 0]; }
+    // Frame data for SETUP > Frames: type is TOOL, USER or JOG; values are [x,y,z,w,p,r] in settings.tools / uframes / jframes
+    frameVec(type, n) { return type === 'TOOL' ? this.toolVec(n).slice() : type === 'USER' ? this.ufVec(n).slice() : (((this.settings.jframes || {})[n]) || [0, 0, 0, 0, 0, 0]).slice(); }
+    setFrameVec(type, n, v) { const s = this.settings; (type === 'TOOL' ? s.tools || (s.tools = {}) : type === 'USER' ? s.uframes || (s.uframes = {}) : s.jframes)[n] = v.slice(); this.regChanged(); }
+    frameCmt(type, n) { return (this.settings[FRAME_TYPES[type].cmt] || {})[n] || ''; }
+    setFrameCmt(type, n, t) { const k = FRAME_TYPES[type].cmt, s = this.settings; (s[k] || (s[k] = {}))[n] = t; this.regChanged(); }
+    frameMethod(type, n) { return this.fmeth[type + n] || 'Direct Entry'; }   // unverified: the list's method label is remembered per frame until power-up
+    activeFrame(type) { return type === 'TOOL' ? this.ut : type === 'USER' ? this.uf : this.jf; }
+    setActiveFrame(type, n) { if (type === 'TOOL') this.ut = n; else if (type === 'USER') this.uf = n; else this.jf = n; }
     robot() {
       return { q: this.q.slice(), tool: this.tool(), moving: !!(this.jog && this.jog.moving) || !!this.moveTo || (this.run.state === 'RUNNING' && !this.run.waiting),
         servoOn: this.servoOn(), uf: this.uf, ut: this.ut };
@@ -482,7 +496,7 @@ const TPController = (() => {
       if (this.coord === 'JOINT') { this.q = this.q.slice(); this.q[axis] += d; return true; }
       const tool = this.tool(), f = C.fk(this.q, tool);
       const R = this.coord === 'WORLD' ? C.I3 : this.coord === 'USER' ? C.frameOf(this.ufVec(this.uf)).R
-        : this.coord === 'TOOL' ? f.R : C.frameOf(((this.settings.jogframes || {})[this.jf]) || [0, 0, 0, 0, 0, 0]).R;
+        : this.coord === 'TOOL' ? f.R : C.frameOf(this.frameVec('JOG', this.jf)).R;
       const ax = C.col(R, axis % 3);
       const p = axis < 3 ? C.add(f.tip, C.scl(ax, d)) : f.tip, Rt = axis < 3 ? f.R : C.matMul(axisRot(ax, d), f.R);
       const s = C.ik(p, Rt, tool, this.q);
@@ -929,7 +943,7 @@ const TPController = (() => {
         const row = this.row;
         if (row === 0 && k === 'DOT') { c.ut = 10; return true; }
         c.startNum({ init: DIGIT[k] === '.' ? '' : DIGIT[k], target: 'jog' + row, prompt: 'Enter value',
-          done: v => { const n = Math.round(+v); if (!(n >= 0 && n <= 10)) return; if (row === 0) { if (n >= 1) c.ut = n; } else if (row === 1) { if (n >= 1) c.jf = n; } else c.uf = n; } });
+          done: v => { const n = Math.round(+v), T = FRAME_TYPES[['TOOL', 'JOG', 'USER'][row]]; if (n >= T.min && n <= T.count) c.setActiveFrame(['TOOL', 'JOG', 'USER'][row], n); } });   // same ranges as SETUP > Frames SETIND
       }
       return true;
     }
@@ -945,7 +959,7 @@ const TPController = (() => {
       { num: 2, label: 'TEST CYCLE', act: 'na' }, { num: 3, label: 'MANUAL FCTNS', act: 'manual' },
       { num: 4, label: 'ALARM', fly: [{ num: 1, label: 'Alarm Log', act: 'alarm' }, ...naItems([null, 'Motion Log', 'System Log', 'Appl Log', 'Comm Log']).slice(1)] },
       { num: 5, label: 'I/O', fly: io },
-      { num: 6, label: 'SETUP', fly: ['Prog Select', 'ZDT Client', 'General', 'Frames', 'Macro', 'Ref Position', 'Port Init', 'Ovrd Select', 'User Alarm'].map((l, i) => ({ num: i + 1, label: l, act: l === 'Macro' ? 'macro' : 'na' })) },   // manual p279 figure (page 1; only Macro is built)
+      { num: 6, label: 'SETUP', fly: ['Prog Select', 'ZDT Client', 'General', 'Frames', 'Macro', 'Ref Position', 'Port Init', 'Ovrd Select', 'User Alarm'].map((l, i) => ({ num: i + 1, label: l, act: l === 'Macro' ? 'macro' : l === 'Frames' ? 'frames' : 'na' })) },   // manual p279 figure (page 1; only Macro is built)
       { num: 7, label: 'FILE', fly: [] },   // contents not in the manual
       { num: 8, blank: true }, { num: 9, label: 'USER', act: 'na' }, { num: 0, label: '-- NEXT --', act: 'next' }];
     const page2 = [   // unverified: only the two items the manual names, positions unknown
@@ -956,6 +970,7 @@ const TPController = (() => {
       const a = x.act;
       if (a === 'alarm') ctl.open(new AlarmScreen(ctl));
       else if (a === 'macro') ctl.open(new MacroScreen(ctl));
+      else if (a === 'frames') ctl.open(new FramesScreen(ctl, ctl.frameType));
       else if (a === 'manual') ctl.open(new ManualMacroScreen(ctl));
       else if (a === 'posn') ctl.open(new PosnScreen(ctl));
       else if (a && a.startsWith('io:')) { ctl.ioView = { kind: a[3], dir: ctl.ioView.dir }; ctl.open(new IOScreen(ctl)); }
@@ -1857,6 +1872,212 @@ const TPController = (() => {
       else if (k === 'DOWN') this.row = Math.min(L.length - 1, this.row + 1);
       else if (k === 'F1') c.msg = NA;
       else if (k === 'F3' && shift && L[this.row]) c.runMacro(L[this.row], false);
+    }
+  }
+
+  // SETUP > Frames list (manual p134, p138): frame values and comments, F3 [OTHER] switches the frame type
+  class FramesScreen {
+    constructor(ctl, type) { this.ctl = ctl; this.type = type || 'TOOL'; this.row = 0; }
+    T() { return FRAME_TYPES[this.type]; }
+    title() { return 'SETUP Frames'; }
+    body() {
+      const c = this.ctl, T = this.T(), n1 = v => (Math.abs(v) < 0.05 ? 0 : v).toFixed(1);
+      const rows = [`   ${padR(T.label, 18)}/ ${padR(c.frameMethod(this.type, this.row + 1), 16)}${this.row + 1}/${T.count}`,
+        `${padL('X', 16)}${padL('Y', 9)}${padL('Z', 9)}   Comment`];
+      for (let i = 1; i <= T.count; i++) {
+        const v = c.frameVec(this.type, i);
+        rows.push([S('  '), S(padL(i, 2), i === this.row + 1 ? 'cursor' : undefined), S(`   ${padL(n1(v[0]), 9)}${padL(n1(v[1]), 9)}${padL(n1(v[2]), 9)}  [${padR(c.frameCmt(this.type, i).slice(0, 16), 16)}]`)]);
+      }
+      if (this.type !== 'TOOL') rows.push('  ' + this.activeText());   // unverified: the tool list has no room for this line (ten rows), so it goes on the prompt line
+      return rows;
+    }
+    activeText() { const c = this.ctl, nb = c.num && c.num.target === 'setind' ? c.num.buf + '_' : c.activeFrame(this.type); return this.T().active(nb); }
+    prompt() { return this.type === 'TOOL' ? this.activeText() : ''; }
+    softkeys() { return ['[ TYPE ]', 'DETAIL', '[ OTHER ]', 'CLEAR', 'SETIND']; }
+    key(k) {
+      const c = this.ctl, T = this.T(), n = this.row + 1;
+      if (k === 'UP') this.row = Math.max(0, this.row - 1);
+      else if (k === 'DOWN') this.row = Math.min(T.count - 1, this.row + 1);
+      else if (k === 'F1') c.msg = NA;
+      else if (k === 'F2' || k === 'ENTER') c.open(new FrameDetailScreen(c, this.type, n));
+      else if (k === 'F3') c.showMenu({ titleFmt: () => 'OTHER', pages: [['Tool Frame', 'Jog Frame', 'User Frame'].map((l, i) => ({ num: i + 1, label: l }))],
+        onPick: x => { c.popup = null; this.type = ['TOOL', 'JOG', 'USER'][x.num - 1]; this.row = 0; c.frameType = this.type; } });
+      else if (k === 'F4') {
+        if (!c.canEdit()) return;
+        c.ask(`Clear ${T.label.toLowerCase()} ${n}?`, () => { c.setFrameVec(this.type, n, [0, 0, 0, 0, 0, 0]); c.setFrameCmt(this.type, n, ''); }, () => {});   // unverified: the manual shows no confirmation text; CLEAR also empties the comment
+      } else if (k === 'F5') {
+        c.startNum({ init: '', target: 'setind', prompt: 'Enter frame number', done: v => {   // unverified: prompt text (the manual only says to enter the number)
+          const x = Math.round(+v);
+          if (!(x >= T.min && x <= T.count)) { c.msg = 'Value out of range'; return; }
+          c.setActiveFrame(this.type, x);
+        } });
+      }
+    }
+  }
+
+  // [METHOD] lists (manual p135 for tool frames; the user and jog lists follow the methods the chapter names)
+  const FRAME_METHODS = {
+    TOOL: ['Three Point', 'Six Point(XZ)', 'Six Point(XY)', 'Two Point + Z', 'Four Point', 'Direct Entry'],
+    USER: ['Three Point', 'Four Point', 'Direct Entry'],   // unverified: item order of the user frame list
+    JOG: ['Three Point', 'Direct Entry']                    // unverified: item order of the jog frame list
+  };
+
+  // ---- frame geometry (world coordinates, mm) ----
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const len3 = a => Math.hypot(a[0], a[1], a[2]);
+  const unit3 = a => C.scl(a, 1 / len3(a));
+  const fromAxes = (x, y, z) => [[x[0], y[0], z[0]], [x[1], y[1], z[1]], [x[2], y[2], z[2]]];
+  const MIN_SIN = 0.0175;   // unverified: points closer to a line than about one degree are refused
+  // User / jog frame from the origin point, a point along +X and a point in the XY plane; the origin may be moved (Four Point)
+  function frameFromPoints(o, px, py, origin) {
+    const X = C.sub(px, o), Y = C.sub(py, o);
+    if (len3(X) < 1 || len3(Y) < 1) return null;
+    const Z = cross3(X, Y);
+    if (len3(Z) / (len3(X) * len3(Y)) < MIN_SIN) return null;
+    const x = unit3(X), z = unit3(Z), y = cross3(z, x);
+    return [...(origin || o), ...C.rToWpr(fromAxes(x, y, z))];
+  }
+  function solve3(A, b) {
+    const det = M => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+    const d = det(A); if (Math.abs(d) < 1e-30) return null;
+    return [0, 1, 2].map(j => det(A.map((r, i) => r.map((v, k) => (k === j ? b[i] : v)))) / d);
+  }
+  // Tool centre point from flange poses {fp, fR} that all touch one fixed point: R_i t + p_i is the same for every i (least squares)
+  function solveTcp(poses) {
+    const n = poses.length, Rm = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]; let pm = [0, 0, 0];
+    for (const o of poses) { pm = C.add(pm, C.scl(o.fp, 1 / n)); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) Rm[i][j] += o.fR[i][j] / n; }
+    for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {   // unverified: orientations closer than 2 degrees are refused
+      const tr = poses[a].fR.reduce((s, r, i) => s + r.reduce((t, v, j) => t + v * poses[b].fR[i][j], 0), 0);
+      if (Math.acos(clamp((tr - 1) / 2, -1, 1)) < 2 * C.D2R) return null;
+    }
+    const AtA = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], Atb = [0, 0, 0];
+    for (const o of poses) {
+      const D = o.fR.map((r, i) => r.map((v, j) => v - Rm[i][j])), bi = C.sub(pm, o.fp);
+      for (let j = 0; j < 3; j++) { for (let k = 0; k < 3; k++) for (let i = 0; i < 3; i++) AtA[j][k] += D[i][j] * D[i][k]; for (let i = 0; i < 3; i++) Atb[j] += D[i][j] * bi[i]; }
+    }
+    const tr = AtA[0][0] + AtA[1][1] + AtA[2][2];
+    const nd = (AtA[0][0] * (AtA[1][1] * AtA[2][2] - AtA[1][2] * AtA[2][1]) - AtA[0][1] * (AtA[1][0] * AtA[2][2] - AtA[1][2] * AtA[2][0]) + AtA[0][2] * (AtA[1][0] * AtA[2][1] - AtA[1][1] * AtA[2][0])) / Math.pow(tr / 3, 3);
+    if (!(nd > 1e-3)) return null;   // turned about one axis only: the offset along it cannot be found
+    const t = solve3(AtA, Atb); if (!t) return null;
+    const pts = poses.map(o => C.add(o.fp, C.matVec(o.fR, t))), c = pts.reduce((s, p) => C.add(s, C.scl(p, 1 / n)), [0, 0, 0]);
+    const errs = pts.map(p => len3(C.sub(p, c)));
+    let at = 0; errs.forEach((e, i) => { if (e > errs[at]) at = i; });
+    return { t, mean: errs.reduce((s, e) => s + e, 0) / n, max: errs[at], at: at + 1 };
+  }
+  const tcpAt = (o, t) => C.add(o.fp, C.matVec(o.fR, t));
+  // How each method turns its recorded points (slots in order) into [x,y,z,w,p,r]; null means the points are no good
+  const FRAME_METHOD_DEFS = {
+    'TOOL:Three Point': { title: 'Three Point', rows: ['Approach point 1', 'Approach point 2', 'Approach point 3'],
+      calc: p => { const s = solveTcp(p); return s && { v: [...s.t, 0, 0, 0] }; } },   // unverified: orientation is left at 0, 0, 0
+    'TOOL:Four Point': { title: 'Four PT Tool', rows: ['Approach point 1', 'Approach point 2', 'Approach point 3', 'Approach point 4'], errors: true,
+      calc: p => { const s = solveTcp(p); return s && { v: [...s.t, 0, 0, 0], err: s }; } },
+    'TOOL:Six Point(XZ)': { title: 'Six Point (XZ)', rows: ['Approach point 1', 'Approach point 2', 'Approach point 3', 'Orient Origin Point', 'X Direction Point', 'Z Direction Point'], calc: p => sixPoint(p, 'XZ') },
+    'TOOL:Six Point(XY)': { title: 'Six Point (XY)', rows: ['Approach point 1', 'Approach point 2', 'Approach point 3', 'Orient Origin Point', 'X Direction Point', 'Y Direction Point'], calc: p => sixPoint(p, 'XY') },
+    'USER:Three Point': { title: 'Three Point', rows: ['Orient Origin Point', 'X Direction Point', 'Y Direction Point'], calc: p => { const v = frameFromPoints(p[0].tip, p[1].tip, p[2].tip); return v && { v }; } },
+    'USER:Four Point': { title: 'Four Point', rows: ['Orient Origin Point', 'X Direction Point', 'Y Direction Point', 'System Origin'], calc: p => { const v = frameFromPoints(p[0].tip, p[1].tip, p[2].tip, p[3].tip); return v && { v }; } },
+    'JOG:Three Point': { title: 'Three Point', rows: ['Orient Origin Point', 'X Direction Point', 'Y Direction Point'], calc: p => { const v = frameFromPoints(p[0].tip, p[1].tip, p[2].tip); return v && { v }; } }
+  };
+  // Six point tool frame: the TCP from the three approach points, the orientation from the directions the TCP moved from the orient origin pose
+  function sixPoint(p, plane) {
+    const s = solveTcp(p.slice(0, 3)); if (!s) return null;
+    const o = tcpAt(p[3], s.t), X = C.sub(tcpAt(p[4], s.t), o), Q = C.sub(tcpAt(p[5], s.t), o);
+    if (len3(X) < 1 || len3(Q) < 1 || len3(cross3(X, Q)) / (len3(X) * len3(Q)) < MIN_SIN) return null;
+    const x = unit3(X); let y, z;
+    if (plane === 'XZ') { y = unit3(cross3(Q, x)); z = cross3(x, y); } else { z = unit3(cross3(x, Q)); y = cross3(z, x); }
+    return { v: [...s.t, ...C.rToWpr(C.matMul(C.matT(p[3].fR), fromAxes(x, y, z)))] };   // unverified: axes are taken in the flange frame at the orient origin pose
+  }
+
+  // Frame detail (manual p135, p148 and the method screens p139-p168): comment, values and the teaching method of one frame
+  class FrameDetailScreen {
+    constructor(ctl, type, n) { this.ctl = ctl; this.type = type; this.n = n; this.row = 0; this.method = ctl.frameMethod(type, n); }
+    T() { return FRAME_TYPES[this.type]; }
+    title() { return 'SETUP Frames'; }
+    def() { return FRAME_METHOD_DEFS[`${this.type}:${this.method}`] || null; }
+    st() {   // recorded points of this frame and method, kept until power-up
+      const c = this.ctl, d = this.def(), k = `${this.type}${this.n}:${this.method}`;
+      return c.fpts[k] || (c.fpts[k] = { pts: d.rows.map(() => null), used: false, err: null });
+    }
+    count() { const d = this.def(); return d ? 1 + d.rows.length : 7; }
+    cmtCells(c) { return c.text && this.row === 0 ? [S(' '.repeat(14)), ...c.text.segments(16)] : null; }
+    body() {
+      const c = this.ctl, T = this.T(), v = c.frameVec(this.type, this.n), d = this.def();
+      const active = '  ' + T.active(c.activeFrame(this.type));
+      if (!d) {   // Direct Entry
+        const rows = [`  ${padR(T.label, 24)}${padR(this.method, 16)}${this.row + 1}/7`, `  Frame Number: ${this.n}`];
+        ['Comment', 'X', 'Y', 'Z', 'W', 'P', 'R'].forEach((nm, i) => {
+          const cur = i === this.row ? 'cursor' : undefined, nb = c.num && c.num.target === `fd:${i}` ? c.num.buf + '_' : null;
+          rows.push([S(`  ${i + 1} ${padR(nm + ':', 10)}`), ...(i === 0 && this.cmtCells(c)) || [S(padL(i === 0 ? c.frameCmt(this.type, this.n) : nb != null ? nb : fmt3(v[i - 1]), 30), cur)]]);
+        });
+        rows.push(`    ${padR('Configuration:', 36)}N D B, 0, 0, 0`, '', active);
+        return rows;
+      }
+      const st = this.st(), n1 = x => (Math.abs(x) < 0.05 ? 0 : x).toFixed(1);
+      const rows = [`  ${padR(T.label, 24)}${padR(d.title, 16)}${this.row + 1}/${this.count()}`, `  Frame Number: ${this.n}`,
+        `    X: ${padL(n1(v[0]), 9)}   Y: ${padL(n1(v[1]), 9)}   Z: ${padL(n1(v[2]), 9)}`, `    W: ${padL(n1(v[3]), 9)}   P: ${padL(n1(v[4]), 9)}   R: ${padL(n1(v[5]), 9)}`,
+        [S('  Comment:  '), ...(this.cmtCells(c) || [S(padL(c.frameCmt(this.type, this.n), 30), this.row === 0 ? 'cursor' : undefined)])]];
+      d.rows.forEach((nm, i) => rows.push([S(`  ${padR(nm + ':', 24)}`), S(st.pts[i] ? (st.used ? 'USED' : 'RECORDED') : 'UNINIT', this.row === i + 1 ? 'cursor' : undefined)]));   // unverified: the word between UNINIT and USED
+      if (d.errors) {
+        const e = st.err;
+        rows.push(`  Mean Error: ${e ? padL(e.mean.toFixed(3), 7) : '*******'} mm`, `  Max. Error: ${e ? padL(e.max.toFixed(3), 7) : '*******'} mm at point[${e ? e.at : 0}]`);
+      }
+      while (rows.length < 11) rows.push('');
+      rows.push(active);
+      return rows;
+    }
+    softkeys() { return ['[ TYPE ]', '[METHOD]', 'FRAME', this.def() && this.row > 0 ? 'MOVE_TO' : '', this.def() && this.row > 0 ? 'RECORD' : '']; }
+    methodMenu() {
+      const c = this.ctl, L = FRAME_METHODS[this.type];
+      c.showMenu({ titleFmt: () => 'METHOD   1', pages: [L.map((l, i) => ({ num: i + 1, label: l }))], onPick: x => { c.popup = null; this.setMethod(x.label); } });
+    }
+    setMethod(m) {
+      const c = this.ctl;
+      if (m === 'Two Point + Z') { c.msg = NA; return; }   // manual p133: not covered by the course manual
+      c.fmeth[this.type + this.n] = m; this.method = m; this.row = 0;
+    }
+    key(k, shift) {
+      const c = this.ctl, d = this.def();
+      if (k === 'UP') this.row = Math.max(0, this.row - 1);
+      else if (k === 'DOWN') this.row = Math.min(this.count() - 1, this.row + 1);
+      else if (k === 'F1') c.msg = NA;
+      else if (k === 'F2') this.methodMenu();
+      else if (k === 'F3') this.frameKey();
+      else if (k === 'ENTER' && this.row === 0) {
+        if (!c.canEdit()) return;
+        c.startText({ init: c.frameCmt(this.type, this.n), max: 16, prompt: 'Enter comment', done: v => c.setFrameCmt(this.type, this.n, v) });
+      } else if (d && this.row > 0 && shift && k === 'F5') this.record(this.row - 1);
+      else if (d && this.row > 0 && shift && k === 'F4') this.moveTo(this.row - 1);
+      else if (!d && this.row > 0 && DIGIT[k] && DIGIT[k] !== ',') {
+        if (!c.canEdit()) return;
+        const row = this.row;
+        c.startNum({ init: DIGIT[k], target: `fd:${row}`, done: x => {
+          const val = +x; if (!isFinite(val)) return;
+          const nv = c.frameVec(this.type, this.n); nv[row - 1] = val; c.setFrameVec(this.type, this.n, nv);
+        } });
+      }
+    }
+    record(i) {   // SHIFT + RECORD: keep the current pose (tool tip in World with the active tool, and the flange pose for tool frames)
+      const c = this.ctl; if (!c.canEdit()) return;
+      const st = this.st(), f = C.fk(c.q, c.tool()), fl = C.fk(c.q, { p: [0, 0, 0], R: C.I3 });
+      st.pts[i] = { tip: f.tip, fp: fl.tip, fR: fl.R, q: c.q.slice() }; st.used = false;
+      if (st.pts.some(p => !p)) return;
+      const r = this.def().calc(st.pts);
+      if (!r) { c.msg = 'Invalid points'; return; }   // unverified: the manual shows no message for points that cannot make a frame; the frame is left as it was
+      c.setFrameVec(this.type, this.n, r.v); st.used = true; st.err = r.err || null; c.msg = 'New position calculated';
+    }
+    moveTo(i) {   // SHIFT + MOVE_TO drives back to a recorded point
+      const c = this.ctl, p = this.st().pts[i];
+      if (!p) { c.msg = 'Position is not recorded'; return; }
+      if (!c.tpMotionOK()) { if (c.tpOn && c.mode !== 'AUTO' && c.deadman !== 'held') c.raiseDeadman(); return; }
+      c.moveTo = { q: p.q.slice() };
+    }
+    frameKey() {   // unverified: F3 FRAME is not described; it asks for another frame number of the same type
+      const c = this.ctl, T = this.T();
+      c.startNum({ init: '', target: 'fdframe', prompt: 'Enter frame number', done: v => {
+        const x = Math.round(+v);
+        if (!(x >= Math.max(1, T.min) && x <= T.count)) { c.msg = 'Value out of range'; return; }
+        this.n = x; this.method = c.frameMethod(this.type, x); this.row = 0;
+      } });
     }
   }
 

@@ -19,7 +19,7 @@ In the app as Pendant mode. Known limits:
 
 - **SHIFT+BWD** only walks back within the paused run's path.
 - **Re-simulation inside a CALLed program** (after an edit, I/O change or WAIT) doesn't return to the caller.
-- **Not available:** editing the default motion instructions, Circle Arc, `FOR`/`ENDFOR`, `SKIP`, Find, Replace and Renumber; frame setup (three-point method); most menu entries (they show "Not available in the trainer").
+- **Not available:** editing the default motion instructions, Circle Arc, `FOR`/`ENDFOR`, `SKIP`, Find, Replace and Renumber; Two Point + Z tool frames, saving frame data to a device; most menu entries (they show "Not available in the trainer").
 - **Start values.** Live register / PR / input values written by the pendant are the same values the simulator starts from; there is no separate pendant state yet.
 - **Pendant UI:** the third key of the numeric block is a half-key pair (`,` and `-`) because the two scans disagree; the left SHIFT is the one `data-key="SHIFT"`. The software keyboard is the physical keyboard (no on-screen keyboard). Controller cabinet keys have no keyboard shortcuts. Test on real touch hardware.
 

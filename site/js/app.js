@@ -13,7 +13,7 @@ const store = {
 
 // ---------- settings ----------
 const settings = (() => {
-  const s = { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, macros: {}, macroAssign: {}, rCmt: {}, prCmt: {}, dataRows: {}, comp: 3, tol: 1, maxTime: 120, waitTimeout: 30, ...store.get('settings2', {}) };
+  const s = { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, jframes: {}, toolCmt: {}, ufCmt: {}, jfCmt: {}, pr: {}, r: {}, inputs: {}, macros: {}, macroAssign: {}, rCmt: {}, prCmt: {}, dataRows: {}, comp: 3, tol: 1, maxTime: 120, waitTimeout: 30, ...store.get('settings2', {}) };
   // migrate v1 settings (tool length + joint-only PRs)
   const oldTool = store.get('tool', null); if (oldTool != null && !store.get('settings2', null)) s.tools[1] = [0, 0, +oldTool, 0, 0, 0];
   const oldPr = store.get('pr', null); if (oldPr && !store.get('settings2', null)) for (const k in oldPr) if (Array.isArray(oldPr[k])) s.pr[k] = { type: 'joint', v: oldPr[k] };

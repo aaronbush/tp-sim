@@ -657,5 +657,234 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
   h.press('FWD'); h.tickUntil(() => h.st().runState === 'PAUSED', 100, 2000); h.up('SHIFT');
   check('12 STEP: then line 2, with RO[1] already on', h.st().program === 'GRIP_OPEN' && h.st().line === 2 && h.c.out['RO[1]'] === 1, JSON.stringify([h.st(), h.c.out]));
  }
+
+// ===== 13. SETUP > Frames: list screens =====
+{ const h = rig().ready();
+  h.host.settings.tools[2] = [10, 20, 30, 0, 0, 90];
+  h.host.settings.uframes[3] = [500, -100, 250, 0, 0, 45];
+  let changed = 0; h.host.settingsChanged = () => changed++;
+  h.press('MENU', 'D6', 'D4');
+  check('13 MENU > SETUP > Frames opens the tool frame list', h.has('SETUP Frames') && h.has('Tool Frame') && /\n\s*2\s+10\.0\s+20\.0\s+30\.0/.test(h.text()) && h.has('[DETAIL]') && h.has('[SETIND]'), h.text());
+  check('13 list shows ten tool frames and the active tool on the prompt line', h.has('Active TOOL $MNUTOOLNUM[1] = 1') && h.has('10  '), h.text());
+  h.press('F3');
+  check('13 [OTHER] lists the three frame types', h.has('Tool Frame') && h.has('Jog Frame') && h.has('User Frame') && h.text().includes('## OTHER'), h.text());
+  h.press('D3');
+  check('13 choosing User Frame shows nine rows and its Active line', h.has('User Frame') && h.has('Active UFRAME $MNUFRAMENUM[1] = 0') && /\n\s*3\s+500\.0\s+-100\.0\s+250\.0/.test(h.text()) && !/\n\s*10\s+0\.0/.test(h.text()), h.text());
+  h.press('F3', 'D2');
+  check('13 choosing Jog Frame shows five rows and Active JOG FRAME', h.has('Jog Frame') && h.has('Active JOG FRAME[1] = 1') && !/\n\s*6\s+0\.0/.test(h.text()), h.text());
+  // SETIND
+  h.press('F5'); h.num(3);
+  check('13 SETIND on the jog list sets the active jog frame', h.c.jf === 3 && h.has('Active JOG FRAME[1] = 3'), h.text());
+  h.press('F5'); h.num(9);
+  check('13 SETIND out of range is refused', h.c.jf === 3 && h.has('Value out of range'), h.text());
+  h.press('F3', 'D3', 'DOWN', 'DOWN', 'F5'); h.num(3);
+  check('13 SETIND on the user list sets UF and the robot reports it', h.c.uf === 3 && h.ctl.robot().uf === 3 && h.has('Active UFRAME $MNUFRAMENUM[1] = 3'), h.text());
+  h.press('F3', 'D1', 'DOWN', 'F5'); h.num(2);
+  check('13 SETIND on the tool list sets UT; POSN uses it', h.c.ut === 2 && h.ctl.robot().ut === 2 && near(h.ctl.robot().tool.p, [10, 20, 30]), h.text());
+  // the jog menu agrees
+  h.down('SHIFT'); h.press('COORD'); h.up('SHIFT');
+  check('13 the jog menu shows the same numbers', h.has('Tool (.=10)  2') && h.has('Jog          3') && h.has('User         3'), h.text());
+  h.press('D7', 'ENTER');
+  check('13 jog menu: Tool 7 through it is the active tool the frames list reports', h.c.ut === 7, h.text());
+  h.press('D1', 'D1', 'ENTER'); h.press('DOWN', 'D6', 'ENTER'); h.press('DOWN', 'D1', 'D0', 'ENTER');
+  check('13 jog menu uses the same ranges: tool 11, jog 6 and user 10 are ignored', h.c.ut === 7 && h.c.jf === 3 && h.c.uf === 3, JSON.stringify([h.c.ut, h.c.jf, h.c.uf]));
+  h.press('PREV'); h.press('F3', 'D1'); h.press('DOWN', 'F5'); h.num(2);
+  // CLEAR
+  const before = changed;
+  h.press('F4');
+  check('13 CLEAR asks first', h.has('Clear tool frame 2?') && h.has('[YES] [NO]'), h.text());
+  h.press('F5');
+  check('13 answering NO leaves the frame alone', near(h.host.settings.tools[2], [10, 20, 30, 0, 0, 90]) && changed === before, h.text());
+  h.press('F4', 'F4');
+  check('13 YES zeroes the frame and tells the host', near(h.host.settings.tools[2], [0, 0, 0, 0, 0, 0]) && changed > before, h.text());
+  // detail
+  h.press('F2');
+  check('13 DETAIL opens the frame with comment, X..R and configuration', h.has('Frame Number: 2') && h.has('1 Comment:') && h.has('7 R:') && h.has('Configuration:') && h.has('N D B, 0, 0, 0') && h.has('1/7'), h.text());
+  h.press('PREV');
+  check('13 PREV returns to the list', h.has('Tool Frame') && h.has('X') && !h.has('Frame Number'), h.text());
+  check('13 jframes starts as an empty table', typeof h.host.settings.jframes === 'object'); }
+
+// ===== 14. Frames: Direct Entry =====
+const enterVals = (h, vals) => { vals.forEach((v, i) => { h.press('DOWN'); h.num(v); }); };   // from the Comment row: X..R
+{ const h = rig().ready();
+  let changed = 0; h.host.settingsChanged = () => changed++;
+  h.press('MENU', 'D6', 'D4', 'DOWN', 'F2');   // tool frame 2
+  check('14 detail shows the Direct Entry method and zero values', h.has('Direct Entry') && h.has('Frame Number: 2') && h.has('2 X:') && h.has('0.000'), h.text());
+  h.press('F2');
+  check('14 [METHOD] lists the six tool frame methods', ['1 Three Point', '2 Six Point(XZ)', '3 Six Point(XY)', '4 Two Point + Z', '5 Four Point', '6 Direct Entry'].every(s => h.has(s)) && h.text().includes('## METHOD'), h.text());
+  h.press('D6');
+  check('14 choosing Direct Entry keeps the screen', h.has('Direct Entry') && !h.text().includes('## METHOD'));
+  h.press('F2', 'D4');
+  check('14 Two Point + Z is not available', h.has('Not available in the trainer'), h.text());
+  h.press('ENTER'); h.ctl.dispatch({ type: 'text', text: 'Gripper' }); h.press('ENTER');
+  check('14 comment entry stores settings.toolCmt', h.host.settings.toolCmt[2] === 'Gripper' && h.has('Gripper'), h.text());
+  enterVals(h, ['10', '-20.5', '150', '0', '90', '0']);
+  check('14 X..R typed and ENTER write settings.tools[2]', near(h.host.settings.tools[2], [10, -20.5, 150, 0, 90, 0]) && changed >= 7, JSON.stringify(h.host.settings.tools[2]));
+  check('14 the detail screen shows the stored numbers', h.has('150.000') && h.has('-20.500'), h.text());
+  h.press('PREV');
+  check('14 the list row shows values and comment', /\n\s*\[\[ 2\]\]\s+10\.0\s+-20\.5\s+150\.0\s+\[Gripper/.test(h.text()), h.text());
+  h.press('F5'); h.num(2);
+  check('14 SETIND 2 makes it the active tool; the arm carries it', h.ctl.robot().ut === 2 && near(h.ctl.robot().tool.p, [10, -20.5, 150]) && near(h.ctl.robot().tool.R.flat(), core.wprToR(0, 90, 0).flat(), 1e-9));
+  // POSN uses the active tool: the tip sits where fk puts it
+  h.press('POSN', 'F4');
+  const tip = core.fk(h.ctl.robot().q, h.ctl.robot().tool).tip;
+  check('14 POSN WORLD reports the tip with the active tool', h.has('x: ' + padF(tip[0]).padStart(10)), h.text());
+  // clear + comment keys need the TP
+  h.tp(false);
+  h.press('MENU', 'D6', 'D4', 'F2'); h.press('DOWN', 'D5');
+  check('14 editing with the TP off is refused', h.has('Teach pendant is disabled') && h.host.settings.tools[1][0] === 0, h.text()); }
+{ const h = rig().ready();
+  // user frame: rotated 90 deg about Z; jogging X in USER moves the tip along world +Y
+  h.press('MENU', 'D6', 'D4', 'F3', 'D3', 'DOWN', 'F2');   // user frame list, frame 2
+  check('14 user frame detail', h.has('User Frame') && h.has('Frame Number: 2'), h.text());
+  enterVals(h, ['100', '200', '300', '0', '0', '90']);
+  check('14 settings.uframes[2] written', near(h.host.settings.uframes[2], [100, 200, 300, 0, 0, 90]), JSON.stringify(h.host.settings.uframes));
+  h.press('PREV', 'F5'); h.num(2);
+  check('14 SETIND makes UF 2 active', h.ctl.robot().uf === 2);
+  h.press('POSN', 'F3');
+  const w0 = core.fk(h.ctl.robot().q, h.ctl.robot().tool).tip;
+  const loc = core.toFrame(core.frameOf([100, 200, 300, 0, 0, 90]), w0, core.fk(h.ctl.robot().q, h.ctl.robot().tool).R);
+  check('14 POSN USER shows the pose in the active user frame', h.has('x: ' + padF(loc.p[0]).padStart(10)) && h.has('Frame: 2'), h.text());
+  h.c.coord = 'USER'; h.c.speedIdx = 6;   // 5 %
+  jog(h, 'J1_POS', 1000);
+  const w1 = core.fk(h.ctl.robot().q, h.ctl.robot().tool).tip, d = core.sub(w1, w0);
+  check('14 jogging X in USER with that frame moves the tip along world +Y', d[1] > 5 && Math.abs(d[0]) < 0.1 && Math.abs(d[2]) < 0.1, JSON.stringify(d)); }
+
+// ===== 15. Frames: user frame Three Point / Four Point =====
+const HOMEF = core.fk(core.HOME, { p: [0, 0, 100], R: core.I3 });
+function teleport(h, p, R) { const s = core.ik(p, R || HOMEF.R, h.c.tool(), h.c.q); if (!s.reach) throw new Error('unreachable test point ' + p); h.c.q = s.q; }
+const recordRow = h => { h.down('SHIFT'); h.press('F5'); h.up('SHIFT'); };
+{ const h = rig().ready();
+  const P1 = HOMEF.tip, a = 30 * Math.PI / 180, ux = [Math.cos(a), Math.sin(a), 0], uy = [-Math.sin(a), Math.cos(a), 0];
+  const P2 = core.add(P1, core.scl(ux, 100)), P3 = core.add(core.add(P1, core.scl(ux, 50)), core.scl(uy, 80));
+  h.press('MENU', 'D6', 'D4', 'F3', 'D3', 'DOWN', 'DOWN', 'DOWN', 'F2', 'F2', 'D1');
+  check('15 Three Point screen: three UNINIT points, comment row, 1/4', h.has('User Frame') && h.has('Three Point') && h.has('1/4') && h.has('Orient Origin Point:') && h.has('X Direction Point:') && h.has('Y Direction Point:') && (h.text().match(/UNINIT/g) || []).length === 3 && h.has('Active UFRAME'), h.text());
+  check('15 softkeys on the comment row have no RECORD', !h.has('[RECORD]'));
+  h.press('DOWN');
+  check('15 on a point row the keys are FRAME, MOVE_TO, RECORD', h.has('[FRAME] [MOVE_TO] [RECORD]'), h.text());
+  teleport(h, P1); recordRow(h);
+  check('15 SHIFT+RECORD marks the point recorded', h.has('RECORDED') && (h.text().match(/UNINIT/g) || []).length === 2, h.text());
+  h.press('DOWN'); teleport(h, P2); recordRow(h);
+  h.press('DOWN'); teleport(h, P3);
+  check('15 the frame is untouched until the last point', !h.host.settings.uframes[4]);
+  recordRow(h);
+  const f = h.host.settings.uframes[4];
+  check('15 the third point computes the frame: origin P1, rotated 30 deg about Z', f && near(f.slice(0, 3), P1, 1e-6) && near(f.slice(3), [0, 0, 30], 1e-6), JSON.stringify(f));
+  check('15 all rows USED and "New position calculated"', (h.text().match(/USED/g) || []).length === 3 && h.has('New position calculated'), h.text());
+  // MOVE_TO drives back to the second point
+  h.press('UP'); teleport(h, P3);
+  h.down('SHIFT'); h.press('F4'); h.tick(100, 100); h.up('SHIFT');
+  check('15 SHIFT+MOVE_TO drives to the recorded point', near(core.fk(h.c.q, h.c.tool()).tip, P2, 0.05), JSON.stringify(core.fk(h.c.q, h.c.tool()).tip));
+  // collinear re-record: refused, frame unchanged
+  h.press('DOWN'); teleport(h, core.add(P1, core.scl(ux, 200))); recordRow(h);
+  check('15 collinear points give the invalid message and keep the frame', h.has('Invalid points') && near(h.host.settings.uframes[4], f, 1e-9) && !h.has('USED'), h.text());
+  // POSN and jogging use it once it is active
+  h.press('PREV', 'F5'); h.num(4); h.c.coord = 'USER';
+  const p0 = core.fk(h.c.q, h.c.tool()).tip; h.c.speedIdx = 6; jog(h, 'J1_POS', 1000);
+  const dd = core.sub(core.fk(h.c.q, h.c.tool()).tip, p0);
+  check('15 jogging along the taught user frame X moves along its +X', dd[0] * ux[0] + dd[1] * ux[1] > 5 && Math.abs(dd[0] * uy[0] + dd[1] * uy[1]) < 0.1 && Math.abs(dd[2]) < 0.1, JSON.stringify(dd)); }
+{ const h = rig().ready();
+  const P1 = HOMEF.tip, P2 = core.add(P1, [0, 120, 0]), P3 = core.add(P1, [-90, 60, 0]), S = core.add(P1, [40, -30, 25]);
+  h.press('MENU', 'D6', 'D4', 'F3', 'D3', 'F2', 'F2', 'D2');
+  check('15 Four Point screen lists the System Origin and counts 1/5', h.has('Four Point') && h.has('System Origin:') && h.has('1/5') && (h.text().match(/UNINIT/g) || []).length === 4, h.text());
+  [P1, P2, P3].forEach(p => { h.press('DOWN'); teleport(h, p); recordRow(h); });
+  check('15 no frame before the fourth point', !h.host.settings.uframes[1] && !h.has('USED'));
+  h.press('DOWN'); teleport(h, S); recordRow(h);
+  const f = h.host.settings.uframes[1];
+  // X toward +Y world, Y toward -X world: a 90 degree turn about Z; origin is the system origin
+  check('15 Four Point: orientation from the first three, origin from System Origin', f && near(f.slice(0, 3), S, 1e-6) && near(f.slice(3), [0, 0, 90], 1e-6), JSON.stringify(f)); }
+
+// ===== 16. Frames: tool frame Three / Four / Six Point =====
+const ZT = { p: [0, 0, 0], R: core.I3 };
+const RH = core.fk(core.HOME, ZT).R;
+function setFlange(h, fp, R) {   // put the flange at fp with orientation R (the hidden "true" tool does the touching)
+  const s = core.ik(fp, R, ZT, h.c.q), f = core.fk(s.q, ZT);
+  if (!s.reach || !near(f.tip, fp, 1e-6) || !near(f.R.flat(), R.flat(), 1e-6)) throw new Error('unreachable tool-frame test pose');
+  h.c.q = s.q;
+}
+const touching = (X0, R, t) => core.sub(X0, core.matVec(R, t));   // flange position that puts the true TCP on X0
+{ const T0 = [30, -20, 150], X0 = [400, 0, 250];
+  const Rs = [RH, core.matMul(core.wprToR(30, 0, 0), RH), core.matMul(core.wprToR(0, 30, 0), RH), core.matMul(core.wprToR(-25, -25, 0), RH)];
+  const h = rig().ready();
+  h.press('MENU', 'D6', 'D4', 'DOWN', 'DOWN', 'DOWN', 'DOWN', 'F2', 'F2', 'D1');   // tool frame 5, Three Point
+  check('16 tool Three Point screen: three approach points, 1/4', h.has('Tool Frame') && h.has('Three Point') && h.has('1/4') && h.has('Approach point 1:') && h.has('Approach point 3:') && (h.text().match(/UNINIT/g) || []).length === 3 && h.has('Active TOOL'), h.text());
+  for (let i = 0; i < 3; i++) { h.press('DOWN'); setFlange(h, touching(X0, Rs[i], T0), Rs[i]); recordRow(h); }
+  const t = h.host.settings.tools[5];
+  check('16 Three Point solves the TCP within 0.5 mm, orientation 0', t && near(t.slice(0, 3), T0, 0.5) && near(t.slice(3), [0, 0, 0]), JSON.stringify(t));
+  check('16 three rows USED and the new-position message', (h.text().match(/USED/g) || []).length === 3 && h.has('New position calculated'), h.text());
+  // the solved tool puts the tip back on the fixed point in all three poses
+  h.press('PREV', 'F5'); h.num(5);
+  check('16 with the new tool active, the tip is on the touched point', near(core.fk(h.c.q, h.c.tool()).tip, X0, 0.5), JSON.stringify(core.fk(h.c.q, h.c.tool()).tip)); }
+{ const T0 = [30, -20, 150], X0 = [400, 0, 250];
+  const h = rig().ready();
+  h.press('MENU', 'D6', 'D4', 'DOWN', 'DOWN', 'DOWN', 'DOWN', 'F2', 'F2', 'D1');
+  // two poses turned about the same axis and one nearly identical to the first: no usable solution
+  const Rs = [RH, core.matMul(core.wprToR(0, 0, 0.5), RH), core.matMul(core.wprToR(0, 0, 40), RH)];
+  for (let i = 0; i < 3; i++) { h.press('DOWN'); setFlange(h, touching(X0, Rs[i], T0), Rs[i]); recordRow(h); }
+  check('16 near-identical orientations are refused and tools[5] stays unset', h.has('Invalid points') && !h.host.settings.tools[5] && !h.has('USED'), h.text()); }
+{ const T0 = [30, -20, 150], X0 = [400, 0, 250];
+  const Rs = [RH, core.matMul(core.wprToR(30, 0, 0), RH), core.matMul(core.wprToR(0, 30, 0), RH), core.matMul(core.wprToR(-25, -25, 0), RH)];
+  const h = rig().ready();
+  h.press('MENU', 'D6', 'D4', 'DOWN', 'DOWN', 'F2', 'F2', 'D5');   // tool frame 3, Four Point
+  check('16 Four Point screen: four points, error lines blank, 1/5', h.has('Four PT Tool') && h.has('1/5') && h.has('Approach point 4:') && h.has('Mean Error: *******') && h.has('Max. Error: ******* mm at point[0]'), h.text());
+  for (let i = 0; i < 4; i++) { h.press('DOWN'); const fp = touching(X0, Rs[i], T0); setFlange(h, i === 3 ? core.add(fp, [3, 0, 0]) : fp, Rs[i]); recordRow(h); }
+  const t = h.host.settings.tools[3];
+  check('16 Four Point solves the TCP (a 3 mm slip on one point averages out)', t && near(t.slice(0, 3), T0, 3), JSON.stringify(t));
+  check('16 Four Point shows mean and max error with the worst point', /Mean Error:\s+[0-9.]+ mm/.test(h.text()) && !h.has('*******') && /Max\. Error:\s+[0-9.]+ mm at point\[[1-4]\]/.test(h.text()), h.text());
+  // re-teach the worst point exactly: errors drop
+  const m = h.text().match(/Mean Error:\s+([0-9.]+)/)[1], at = +h.text().match(/at point\[(\d)\]/)[1];
+  h.press('UP', 'UP', 'UP', 'UP'); for (let i = 0; i < at; i++) h.press('DOWN');
+  setFlange(h, touching(X0, Rs[at - 1], T0), Rs[at - 1]); recordRow(h);
+  const m2 = h.text().match(/Mean Error:\s+([0-9.]+)/)[1];
+  check('16 re-recording the max-error point lowers the mean error', +m2 < +m, m + ' -> ' + m2); }
+{ const T0 = [30, -20, 150], X0 = [400, 0, 250], Rtool = core.wprToR(10, 20, 30);
+  const Rs = [RH, core.matMul(core.wprToR(30, 0, 0), RH), core.matMul(core.wprToR(0, 30, 0), RH)];
+  for (const plane of ['XZ', 'XY']) {
+    const h = rig().ready();
+    h.press('MENU', 'D6', 'D4', 'F2', 'F2', plane === 'XZ' ? 'D2' : 'D3');   // tool frame 1, Six Point
+    check(`16 Six Point (${plane}) screen: six rows, 1/7`, h.has(`Six Point (${plane})`) && h.has('1/7') && h.has('Orient Origin Point:') && h.has('X Direction Point:') && h.has(`${plane[1]} Direction Point:`) && (h.text().match(/UNINIT/g) || []).length === 6, h.text());
+    for (let i = 0; i < 3; i++) { h.press('DOWN'); setFlange(h, touching(X0, Rs[i], T0), Rs[i]); recordRow(h); }
+    const Ro = RH, To = [400, 10, 240], ax = core.matVec(core.matMul(Ro, Rtool), plane === 'XZ' ? [0, 0, 1] : [0, 1, 0]), xx = core.matVec(core.matMul(Ro, Rtool), [1, 0, 0]);
+    for (const T of [To, core.add(To, core.scl(xx, 100)), core.add(To, core.scl(ax, 100))]) { h.press('DOWN'); setFlange(h, touching(T, Ro, T0), Ro); recordRow(h); }
+    const t = h.host.settings.tools[1];
+    check(`16 Six Point (${plane}): TCP and W P R come out as taught`, t && near(t.slice(0, 3), T0, 0.5) && near(t.slice(3), [10, 20, 30], 0.05) && (h.text().match(/USED/g) || []).length === 6, JSON.stringify(t));
+  } }
+
+// ===== 17. Frames: jog frames =====
+{ const h = rig().ready();
+  const P1 = HOMEF.tip, a = 40 * Math.PI / 180, ux = [Math.cos(a), Math.sin(a), 0], uy = [-Math.sin(a), Math.cos(a), 0];
+  const P2 = core.add(P1, core.scl(ux, 90)), P3 = core.add(P1, core.scl(uy, 70));
+  h.press('MENU', 'D6', 'D4', 'F3', 'D2', 'DOWN', 'DOWN', 'F2');   // jog frame list, frame 3
+  check('17 jog frame detail: Jog Frame, Direct Entry, Active JOG FRAME', h.has('Jog Frame') && h.has('Direct Entry') && h.has('Frame Number: 3') && h.has('Active JOG FRAME[1] = 1'), h.text());
+  h.press('F2');
+  check('17 jog frames offer only Three Point and Direct Entry', h.has('1 Three Point') && h.has('2 Direct Entry') && !h.has('Six Point') && !h.has('Four Point'), h.text());
+  h.press('D1');
+  check('17 Jog Frame Three Point screen: 1/4, three points', h.has('Jog Frame') && h.has('Three Point') && h.has('1/4') && (h.text().match(/UNINIT/g) || []).length === 3, h.text());
+  [P1, P2, P3].forEach(p => { h.press('DOWN'); teleport(h, p); recordRow(h); });
+  const f = h.host.settings.jframes[3];
+  check('17 the frame lands in settings.jframes and the arm is not moved by it', f && near(f.slice(0, 3), P1, 1e-6) && near(f.slice(3), [0, 0, 40], 1e-6) && Object.keys(h.host.settings.uframes).length === 0, JSON.stringify(f));
+  // JGFRM jogging follows the active jog frame (1 is World until SETIND)
+  h.press('PREV', 'F5'); h.num(3); h.c.coord = 'JGFRM'; h.c.speedIdx = 6;
+  teleport(h, P1);
+  let p0 = core.fk(h.c.q, h.c.tool()).tip; jog(h, 'J1_POS', 1000);
+  let d = core.sub(core.fk(h.c.q, h.c.tool()).tip, p0);
+  check('17 JGFRM X jogs along the taught jog frame', d[0] * ux[0] + d[1] * ux[1] > 5 && Math.abs(d[0] * uy[0] + d[1] * uy[1]) < 0.1 && Math.abs(d[2]) < 0.1, JSON.stringify(d));
+  h.press('F5'); h.num(2); teleport(h, P1); p0 = core.fk(h.c.q, h.c.tool()).tip; jog(h, 'J1_POS', 1000);
+  d = core.sub(core.fk(h.c.q, h.c.tool()).tip, p0);
+  check('17 an untaught jog frame is World', d[0] > 5 && Math.abs(d[1]) < 0.1 && Math.abs(d[2]) < 0.1, JSON.stringify(d)); }
+{ const h = rig().ready();
+  h.press('MENU', 'D6', 'D4', 'F3', 'D2', 'F2');   // jog frame 1, Direct Entry (default method)
+  h.press('DOWN'); h.num(0); h.press('DOWN'); h.num(0); h.press('DOWN'); h.num(0); h.press('DOWN'); h.num(0); h.press('DOWN'); h.num(0); h.press('DOWN'); h.num(90);
+  check('17 Direct Entry writes settings.jframes[1]', near(h.host.settings.jframes[1], [0, 0, 0, 0, 0, 90]), JSON.stringify(h.host.settings.jframes));
+  h.c.coord = 'JGFRM'; h.c.speedIdx = 6; const p0 = core.fk(h.c.q, h.c.tool()).tip; jog(h, 'J1_POS', 1000);
+  const d = core.sub(core.fk(h.c.q, h.c.tool()).tip, p0);
+  check('17 a jog frame turned 90 deg about Z sends X jogs along world +Y', d[1] > 5 && Math.abs(d[0]) < 0.1, JSON.stringify(d));
+  h.press('PREV', 'F4', 'F4');
+  check('17 CLEAR zeroes a jog frame', near(h.host.settings.jframes[1], [0, 0, 0, 0, 0, 0]));
+  h.press('F3', 'D3'); h.press('F3', 'D2');
+  h.press('DOWN', 'F2', 'ENTER'); h.ctl.dispatch({ type: 'text', text: 'Fixture' }); h.press('ENTER');
+  check('17 comment goes to settings.jfCmt', h.host.settings.jfCmt[2] === 'Fixture', JSON.stringify(h.host.settings.jfCmt)); }
+function padF(v) { return (Math.abs(v) < 0.0005 ? 0 : v).toFixed(3); }
+
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

@@ -9,7 +9,7 @@
   const PLAYBACK = ['playBtn', 'restartBtn', 'prevBtn', 'stepBtn', 'scrub'];
   const ZERO6 = [0, 0, 0, 0, 0, 0];
   const panel = $('pendantPanel'), mount = $('pendantMount'), btn = $('pendantBtn');
-  let ctl = null, on = false, status = null, lastSel = '', syncTimer = 0, dataTimer = 0, lastPoll = 0, lastSig = '', lastMacro = JSON.stringify([settings.macros, settings.macroAssign]), lastReadout = '';
+  let ctl = null, on = false, status = null, lastSel = '', syncTimer = 0, dataTimer = 0, lastPoll = 0, lastSig = '', lastMacro = JSON.stringify([settings.macros, settings.macroAssign]), lastFrames = JSON.stringify([settings.tools, settings.uframes, settings.jframes]), lastReadout = '';
 
   // ---- host: the workspace as the controller sees it ----
   // Pendant edits arrive one step at a time; re-simulating after every one would be wasteful, so the
@@ -20,9 +20,9 @@
   }
   function dataSoon() {
     clearTimeout(dataTimer);
-    dataTimer = setTimeout(() => { lastSig = sigOfData(); saveSettings(); updateData(); const m = JSON.stringify([settings.macros, settings.macroAssign]); if (m !== lastMacro) { lastMacro = m; rerun(true); } }, 150);   // a changed macro table re-runs so the Macros panel and macro lines follow it
+    dataTimer = setTimeout(() => { lastSig = sigOfData(); saveSettings(); updateData(); const m = JSON.stringify([settings.macros, settings.macroAssign]); if (m !== lastMacro) { lastMacro = m; rerun(true); } const fr = JSON.stringify([settings.tools, settings.uframes, settings.jframes]); if (fr !== lastFrames) { lastFrames = fr; lastRefsKey = ''; rerun(true); } }, 150);   // a changed macro table re-runs so the Macros panel and macro lines follow it
   }
-  const sigOfData = () => JSON.stringify([settings.r, settings.pr, settings.inputs, settings.rCmt, settings.prCmt, settings.macros, settings.macroAssign]);
+  const sigOfData = () => JSON.stringify([settings.r, settings.pr, settings.inputs, settings.rCmt, settings.prCmt, settings.macros, settings.macroAssign, settings.tools, settings.uframes, settings.jframes, settings.toolCmt, settings.ufCmt, settings.jfCmt]);
   const host = {
     listPrograms: () => programs.map(p => p.name),
     getProgram(name) {

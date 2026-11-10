@@ -8,12 +8,11 @@ What the trainer covers and what it doesn't, one row per feature, so every gap i
 
 Ordered by value to a student working through the course labs:
 
-1. **Frame setup on the pendant** (SETUP > Frames: tool 3/6-point, user 3-point/4-point, jog frames). Chapter 10 is the longest lab chapter; today frames are typed into Settings.
-2. **Miscellaneous instructions**: `SKIP`/`SKIP CONDITION`, `TIMER[ ]`, `MESSAGE`, `PAYLOAD`, `INC` (chapter 17 labs). Neither side simulates them.
-3. **`FOR`/`ENDFOR`, `IF (...)` with AND/OR and `CALL program()` on the pendant** (chapter 15). The simulator already runs `FOR`; the pendant can't insert it.
-4. **Group, analog and UOP I/O screens** (chapter 14), with GI/GO bit mapping to DI/DO.
-5. **Auto-mode macros** (DI/RI/UI/SOP triggers, chapter 16): the table accepts the assignment but nothing fires it.
-6. **Find, Replace, Renumber** in EDCMD (chapter 13), and **editing the default motion lines** (ED_DEF).
+1. **Miscellaneous instructions**: `SKIP`/`SKIP CONDITION`, `TIMER[ ]`, `MESSAGE`, `PAYLOAD`, `INC` (chapter 17 labs). Neither side simulates them.
+2. **`FOR`/`ENDFOR`, `IF (...)` with AND/OR and `CALL program()` on the pendant** (chapter 15). The simulator already runs `FOR`; the pendant can't insert it.
+3. **Group, analog and UOP I/O screens** (chapter 14), with GI/GO bit mapping to DI/DO.
+4. **Auto-mode macros** (DI/RI/UI/SOP triggers, chapter 16): the table accepts the assignment but nothing fires it.
+5. **Find, Replace, Renumber** in EDCMD (chapter 13), and **editing the default motion lines** (ED_DEF).
 7. **Program detail fields** (group mask, write protect, ignore pause, stack size) and SELECT `[ATTR]`, `LOAD`, `SAVE AS`.
 8. **Circle Arc motion and CONFIG-aware solutions** (arm configuration is ignored today).
 
@@ -30,7 +29,7 @@ Ordered by value to a student working through the course labs:
 | MENU > I/O > Digital, Robot | p243-p257 | Done | n/a | See Data & I/O |
 | MENU > I/O > Cell Intface, Custom, Analog, Group, UOP, SOP, Interconnect | p254 | Not available | n/a | See Data & I/O |
 | MENU > SETUP > Macro | p295 | Done | Done | Instruction name, program, assignment type and number; shared with Settings > Macros |
-| MENU > SETUP > Frames | p134-p137 | Not available | Partial | Pendant screen missing; frames are typed in Settings |
+| MENU > SETUP > Frames | p134-p176 | Done | Partial | Tool, jog and user lists via [OTHER], DETAIL, CLEAR (confirmation text unverified), SETIND; the simulator view still takes typed values in Settings |
 | MENU > SETUP > Prog Select, ZDT Client, General, Ref Position, Port Init, Ovrd Select, User Alarm | p295 figure | Not available | Not available | Listed from the manual's figure; no screens |
 | MENU > FILE | not in manual | Not available | Partial | Fly-out empty; the page's Open / download of `.ls` files stands in |
 | MENU > USER | p254 | Not available | n/a | |
@@ -135,9 +134,10 @@ Ordered by value to a student working through the course labs:
 | COORD cycling, SHIFT+COORD jog menu | p076, p137 | Done | Partial | Cycle order is unverified |
 | Speed override keys, SHIFT steps | p059-p060 | Done | n/a | |
 | WRIST JOG | p068 | Not available | n/a | |
-| Jog frames (JGFRM) | p137 | Partial | Not available | Frame n defaults to World; no screen sets them |
+| Jog frames (JGFRM) | p137, p163-p169 | Done | Not available | Jog frame n is taught on the pendant (Three Point or Direct Entry); an untaught one is World. The Settings panel has no jog frame rows |
 | User frame use (UFRAME_NUM, UF in jog / POSN) | p134-p160 | Done | Done | |
-| Frame setup: tool 3/6-point, user 3/4-point, jog frame | p134-p176 | Not available | Partial | Settings panel takes typed values only |
+| Frame setup: tool Three / Four / Six Point (XZ, XY), user Three / Four Point, jog Three Point, Direct Entry for all | p117-p169 | Done | Partial | Tool Two Point + Z is not in the course manual (shows "Not available in the trainer"). Settings panel takes typed values only and shows the frames the open program uses |
+| Saving and restoring frame data (FILE, FRAMEVAR.VR / SYSFRAME.SV) | p169-p172 | Not available | n/a | The page saves frames with the other settings |
 | POSN screen: JNT, USER, WORLD | p080-p081 | Done | Done (readout) | [TYPE] list not available; joint zero/sign is this arm model's |
 | Unreachable position (MOTN-018) | not in manual | Partial | Done | Alarm text unverified |
 | Arm configuration (CONFIG, flip / elbow) | p205-p224 | Not available | Not available | Only front / elbow-up / non-flip is solved |
