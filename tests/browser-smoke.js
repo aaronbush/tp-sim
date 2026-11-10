@@ -26,6 +26,10 @@ server.listen(0, async () => {
     await page.goto(url); await page.waitForTimeout(1500);
     // narrow screens use the phone layout: bottom tabs pick what shows under the 3D view
     const phone = await page.isVisible('#phoneTabs');
+    if (!phone) {   // wider screens open in Pendant mode; the checks below start from the simulator view
+      check(`${w}px ${scheme}: opens in Pendant mode`, await page.evaluate(() => document.body.classList.contains('pendant-mode')));
+      await page.click('#pendantBtn');
+    }
     const pane = async p => { if (phone) { await page.click(`#phoneTabs [data-pane="${p}"]`); await page.waitForTimeout(150); } };
     const teach = async on => { if (phone) await pane(on ? 'teach' : 'run'); else await page.click('#teachBtn'); await page.waitForTimeout(200); };
     const tabs = await page.$$eval('.tab', e => e.map(x => x.textContent.replace('×', '').trim()));

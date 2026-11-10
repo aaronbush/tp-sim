@@ -149,7 +149,7 @@ const TPPendant = (() => {
     const strip = h('section', 'tp-strip'); strip.setAttribute('aria-label', 'Controls that are not on the pendant face');
     strip.innerHTML =
       '<div class="hd">Not on the pendant face</div>' +
-      '<div class="grp"><div class="grp-t">Back of pendant <small>deadman switch (hold it while jogging or testing)</small></div>' +
+      '<div class="grp"><div class="grp-t">Back of pendant <small>deadman switch (hold it while jogging or testing; keyboard: hold Space)</small></div>' +
       '<button type="button" class="dm" data-ctl="deadman" aria-pressed="false" aria-label="Deadman switch, back of pendant">Deadman: released</button></div>' +
       '<div class="grp"><div class="grp-t">Controller panel <small>cabinet controls</small></div>' +
       '<span class="modes" role="group" aria-label="Mode switch"><button type="button" data-ctl="mode-T1" aria-pressed="false">T1</button><button type="button" data-ctl="mode-T2" aria-pressed="false">T2</button><button type="button" data-ctl="mode-AUTO" aria-pressed="false">AUTO</button></span>' +
@@ -157,6 +157,18 @@ const TPPendant = (() => {
       '<button type="button" class="pe" data-ctl="estop-panel" aria-pressed="false" aria-label="Controller panel emergency stop">Panel E-STOP</button></div>';
     root.appendChild(strip);
     const dmBtn = strip.querySelector('[data-ctl="deadman"]');
+    // faint keyboard hints in the corner of each key (opts.hints: false turns them off); keys whose keyboard key is the obvious one get none
+    if (opts.hints !== false) {
+      const SHORT = { 'Page Up': 'PgUp', 'Page Down': 'PgDn', 'Delete': 'Del', 'Insert': 'Ins', 'Shift (hold)': 'Shift' };
+      const SKIP = /^(D[0-9]|F[1-5]|UP|DOWN|LEFT|RIGHT|ENTER|BACKSPACE|DOT|COMMA|MINUS|DEADMAN)$/;
+      KM.forEach(m => {
+        if (SKIP.test(m.pendantKey)) return;
+        root.querySelectorAll('[data-key="' + m.pendantKey + '"],[data-twin="' + m.pendantKey + '"]').forEach(el => {
+          if (el.querySelector('.kh')) return;
+          const sp = document.createElement('span'); sp.className = 'kh'; sp.setAttribute('aria-hidden', 'true'); sp.textContent = SHORT[m.key] || m.key; el.appendChild(sp);
+        });
+      });
+    }
 
     // ---------- hold bookkeeping: one keyDown when the first source presses, one keyUp when the last releases ----------
     const holds = new Map(); // name -> Set(sources)

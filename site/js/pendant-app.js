@@ -73,7 +73,7 @@
   }
 
   // ---- mode on / off ----
-  function setOn(v) {
+  function setOn(v, quiet) {
     v = !!v; if (v === on) return;
     if (v) {
       if (teachHook && teachHook.active()) $('teachBtn').click();
@@ -87,7 +87,7 @@
       playing = false; updatePlay();
       PLAYBACK.forEach(id => $(id).disabled = true);
       lastReadout = ''; lastSig = sigOfData();
-      if (!phoneMQ.matches) mount.focus({ preventScroll: true });
+      if (!phoneMQ.matches && !quiet) mount.focus({ preventScroll: true });
     } else {
       panel.hidden = true;
       { const t = !!(teachHook && teachHook.active()); PLAYBACK.forEach(id => $(id).disabled = t); }
@@ -95,7 +95,7 @@
       saveSettings(); lastRefsKey = ''; rerun(true); paperDirty = true; lastStepShown = -2;
     }
   }
-  btn.addEventListener('click', () => setOn(!on));
+  btn.addEventListener('click', () => { setOn(!on); store.set('pendant', on); });   // remember the choice for next time
   // Teach mode and Pendant mode both own the arm: starting Teach leaves Pendant first
   $('teachBtn').addEventListener('click', () => { if (on) setOn(false); }, true);
   phoneMQ.addEventListener('change', () => { if (phoneMQ.matches) setOn(document.body.dataset.pane === 'pendant'); });
@@ -130,4 +130,6 @@
     const box = $('pendantKeys'); if (!box) return;
     box.innerHTML = TPPendant.keymap.map(m => `<span class="pk"><kbd>${esc(m.key)}</kbd><span>${esc(m.label)}</span></span>`).join('');
   })();
+  // The pendant is what the course teaches, so wider screens start in Pendant mode unless it was switched off last time.
+  if (!phoneMQ.matches && store.get('pendant', true)) setOn(true, true);
 })();

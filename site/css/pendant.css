@@ -184,3 +184,6 @@
 .tp-strip .dm { min-width: 30cqw; }
 .tp-title .fbd { margin-left: auto; margin-right: 1ch; background: var(--tp-lamp-fault); color: #fff; padding: 0 .5ch; border-radius: .15em; font-weight: 700; font-size: .85em; }
 .tp-screen.alpha-popup .tp-body .row { opacity: 1; }
+.tp-pendant [data-key], .tp-pendant [data-twin] { position: relative; }
+.tp-pendant .kh { position: absolute; top: .2em; right: .35em; font: 600 .56em/1 var(--mono, ui-monospace, monospace); letter-spacing: 0; text-transform: none; opacity: .62; pointer-events: none; }
+@media (hover: none) { .tp-pendant .kh { display: none; } }
