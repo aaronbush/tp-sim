@@ -13,7 +13,7 @@ const store = {
 
 // ---------- settings ----------
 const settings = (() => {
-  const s = { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, macros: {}, rCmt: {}, prCmt: {}, dataRows: {}, comp: 3, tol: 1, maxTime: 120, waitTimeout: 30, ...store.get('settings2', {}) };
+  const s = { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, macros: {}, macroAssign: {}, rCmt: {}, prCmt: {}, dataRows: {}, comp: 3, tol: 1, maxTime: 120, waitTimeout: 30, ...store.get('settings2', {}) };
   // migrate v1 settings (tool length + joint-only PRs)
   const oldTool = store.get('tool', null); if (oldTool != null && !store.get('settings2', null)) s.tools[1] = [0, 0, +oldTool, 0, 0, 0];
   const oldPr = store.get('pr', null); if (oldPr && !store.get('settings2', null)) for (const k in oldPr) if (Array.isArray(oldPr[k])) s.pr[k] = { type: 'joint', v: oldPr[k] };
@@ -178,7 +178,7 @@ function rerun(keepTime, frac) {
   // only ask for starting values the program doesn't set itself
   refs.prNeed = new Set([...refs.PR].filter(n => !reach.some(p => p.ins.some(x => x.type === 'assign' && x.lhs.kind === 'PR' && x.lhs.elem == null && x.lhs.idx === n))));
   refs.rNeed = new Set([...refs.R].filter(n => !reach.some(p => p.ins.some(x => (x.type === 'assign' && x.lhs.kind === 'R' && x.lhs.idx === n) || (x.type === 'for' && x.reg.idx === n)))));
-  const key = JSON.stringify({ R: [...refs.rNeed], PR: [...refs.prNeed], UF: [...refs.UF], UT: [...refs.UT], I: [...refs.inputs], O: [...refs.outputs], M: [...refs.macros], P: programs.map(p => p.name) });
+  const key = JSON.stringify({ R: [...refs.rNeed], PR: [...refs.prNeed], UF: [...refs.UF], UT: [...refs.UT], I: [...refs.inputs], O: [...refs.outputs], M: [...refs.macros], MT: settings.macros, P: programs.map(p => p.name) });
   sim.refs = refs;
   if (key !== lastRefsKey) { lastRefsKey = key; renderSettings(refs); }
   renderIssues(); updateData(); buildScene(); paperDirty = true;

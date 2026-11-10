@@ -7,7 +7,7 @@ const TPController = (() => {
   // core.js names are globals in the browser; in Node they come from require().
   const C = typeof parseLS === 'function'
     ? { parseLS, makeProgram, parseLine, parsePositions, toLS, formatPosition, runSim, fk, ik, wprToR, rToWpr,
-        frameOf, toWorld, toFrame, poseToV6, HOME, ROBOT, add, sub, scl, matMul, matT, col, I3, D2R, defaultHeader }
+        frameOf, toWorld, toFrame, poseToV6, HOME, ROBOT, add, sub, scl, matMul, matT, col, I3, D2R, defaultHeader, macroKey }
     : require('./core.js');
 
   // ---------- constants ----------
@@ -132,7 +132,7 @@ const TPController = (() => {
   const INST = {
     title: 'Instruction', next: 8, pages: [
       [it('Registers', 'M:reg'), it('I/O', 'M:io'), it('IF/SELECT', 'M:if'), it('WAIT', 'M:wait'), it('JMP/LBL', 'M:jmp'), it('CALL', 'M:call'), it('Miscellaneous', 'M:misc')],
-      [it('Skip', null), it('Payload', null), it('Offset/Frames', 'M:frames'), it('Multiple control', null), it('Program control', null), it('MACRO', null), it('FOR/ENDFOR', null)],
+      [it('Skip', null), it('Payload', null), it('Offset/Frames', 'M:frames'), it('Multiple control', null), it('Program control', null), it('MACRO', 'M:macro'), it('FOR/ENDFOR', null)],
       []]   // page 3/3 is illegible in the manual
   };
   const INST_SUB = {
@@ -223,7 +223,7 @@ const TPController = (() => {
     }
     get settings() {
       const s = this.host.settings || (this.host.settings = {});
-      if (!s.r) s.r = {}; if (!s.pr) s.pr = {}; if (!s.inputs) s.inputs = {};
+      if (!s.r) s.r = {}; if (!s.pr) s.pr = {}; if (!s.inputs) s.inputs = {}; if (!s.macros) s.macros = {}; if (!s.macroAssign) s.macroAssign = {};
       return s;
     }
     powerUp() {
@@ -399,6 +399,7 @@ const TPController = (() => {
         if (this.popup.key(k) !== false) return;
         this.popup = null; return;   // PREV closes the popup
       }
+      if (this.userKeyMacro(k)) return;
       if (this.hardKey(k)) return;
       if (k === 'PREV') { const t = this.top(); if (t.prev && t.prev()) return; this.back(); return; }
       if (k === 'NEXT') { const t = this.top(); if (t.next) t.next(); return; }
@@ -429,7 +430,7 @@ const TPController = (() => {
     keyUp(k) {
       if (k === 'SHIFT') {
         this.shift = false; this.jog = null; this.moveTo = null;
-        if (this.run.state === 'RUNNING' && this.run.byTP) this.pause();   // releasing SHIFT pauses a TP test run
+        if (this.run.state === 'RUNNING' && this.run.byTP && !this.run.noShift) this.pause();   // releasing SHIFT pauses a TP test run
         return;
       }
       this.down.delete(k);
@@ -641,6 +642,34 @@ const TPController = (() => {
       if (dir === 'bwd') return this.startBwd();
       this.startRun(this.stepMode ? 'step' : 'cont', true);
     }
+    // ----- macros (manual ch. 16) -----
+    macroFor(type, num) { const s = this.settings; return Object.keys(s.macros).find(k => { const a = s.macroAssign[k]; return a && a.type === type && a.num === num; }) || null; }
+    macroMoves(prog) { const e = this.loadProg(prog); return !!e && this.texts(e).some(t => splitMotion(t)); }
+    // Run a macro's program by hand: same conditions as a TP test run. noShift: a user key pressed alone (no SHIFT needed once started).
+    runMacro(key, noShift) {
+      const prog = this.settings.macros[key];
+      if (this.mode === 'AUTO' || !this.tpOn) return;
+      if (!prog) { this.msg = 'No program is assigned to this macro'; return; }   // unverified: prompt text
+      if (!noShift && this.deadman !== 'held') { this.raiseDeadman(); return; }
+      if (this.hasFault() || !this.servoOn() || this.run.state === 'RUNNING') return;
+      if (!this.loadProg(prog)) { this.msg = 'Program not found'; return; }   // unverified: prompt text
+      if (this.run.state === 'PAUSED' && this.run.sim) {   // unverified: the manual doesn't say what a macro does while a program is paused; refuse like a run request for another program
+        this.raise(ALARM.LOCKED, 'stop');
+        this.raise(`INTP-105 (${prog}, 1) Run request failed`, 'stop');
+        return;
+      }
+      if (this.resim(prog, 1, this.stepMode ? 'step' : 'cont', true, true)) this.run.noShift = !!noShift;
+    }
+    // TOOL 1, TOOL 2, MOVE MENU, SETUP, STATUS, I/O, POSN double as user keys 1-7 (manual p277)
+    userKeyMacro(k) {
+      const n = USER_KEYS.indexOf(k) + 1;
+      if (!n || this.mode === 'AUTO' || !this.tpOn) return false;
+      const type = this.shift ? 'SU' : 'UK', key = this.macroFor(type, n);
+      if (!key) return false;
+      if (type === 'UK' && this.macroMoves(this.settings.macros[key])) { this.msg = 'This macro moves the robot: use a SHIFT user key'; return true; }   // manual p277: UK macros can't move the robot; unverified: prompt text
+      this.runMacro(key, type === 'UK');
+      return true;
+    }
     // Where a paused run would carry on: the line in progress, else the next line
     resumePoint() {
       const r = this.run, st = r.sim.steps;
@@ -686,7 +715,7 @@ const TPController = (() => {
       const sim = C.runSim(prog, this.allParsed(), st);
       if (!sim || sim.error) { this.msg = sim && sim.error ? sim.error : 'Program not found'; return false; }
       this.run = { state: 'RUNNING', sim, root: fresh ? prog : (prev.root || prog), cur: -1, next: 0, t: 0, i: 0,
-        go: mode || prev.go || 'cont', byTP: byTP != null ? byTP : prev.byTP, dirty: false, held: false, cursorMoved: false, waiting: false };
+        go: mode || prev.go || 'cont', byTP: byTP != null ? byTP : prev.byTP, noShift: !fresh && !!prev.noShift, dirty: false, held: false, cursorMoved: false, waiting: false };
       this.execProg = prog; this.execLine = line;
       return true;
     }
@@ -742,7 +771,7 @@ const TPController = (() => {
     tickRun(dt) {
       let r = this.run;
       if (r.waiting) return;
-      if (r.byTP && (!this.tpMotionOK() || !this.shift)) { this.pause(); return; }
+      if (r.byTP && (r.noShift ? !(this.mode !== 'AUTO' && this.tpOn && !this.hasFault() && this.servoOn()) : (!this.tpMotionOK() || !this.shift))) { this.pause(); return; }
       if (!r.byTP && (this.hasFault() || !this.servoOn() || this.tpOn || this.mode !== 'AUTO')) { this.pause(); return; }
       if (r.go === 'bwd') {
         const left = this.advance(dt, r.bwdT, -1);
@@ -869,7 +898,18 @@ const TPController = (() => {
       return true;
     }
   }
+  const MACRO_NAME = /^[A-Za-z_][A-Za-z0-9_ ]*$/;   // what the .ls macro line (and core.js) can read back
+  const USER_KEYS = ['TOOL1', 'TOOL2', 'MOVE_MENU', 'SETUP', 'STATUS', 'IO', 'POSN'];   // UK[1]..UK[7] / SU[1]..SU[7]
+  const subtypeOf = e => { const m = e && /^\/PROG\s+\S+[ \t]+(\S+)/.exec(e.header || ''); return m ? m[1] : 'None'; };
   const validName = s => /^[A-Za-z][A-Za-z0-9_]{0,35}$/.test(s);   // manual: letter first, no @ * or spaces, max 36
+
+  function setSubtype(ctl, name, sub) {
+    const e = ctl.loadProg(name); if (!e) return;
+    const h = e.header && e.header.trim() ? e.header : C.defaultHeader(e.name);
+    const nh = h.replace(/^(\/PROG[ \t]+\S+)[^\r\n]*/, `$1${sub === 'None' ? '' : '\t' + sub}`);
+    if (nh === e.header) return;
+    e.header = nh; ctl.saveProg(e);
+  }
 
   // ---------- jog menu (SHIFT + COORD) ----------
   class JogMenu {
@@ -902,10 +942,10 @@ const TPController = (() => {
       { label: 'Group', act: 'na' }, { label: 'Robot', act: 'io:R' }, { label: 'UOP', act: 'na' }, { label: 'SOP', act: 'na' }, { label: 'Interconnect', act: 'na' }].map((x, i) => ({ ...x, num: i + 1 }));
     const page1 = [
       { num: 1, label: 'UTILITIES', fly: naItems(['Home', 'Hints', 'iRCalibration', 'Robot Condition', 'Prog Adjust', 'Program Shift', 'Mirror Image Shift', 'Tool Offset', 'Frame Offset']) },
-      { num: 2, label: 'TEST CYCLE', act: 'na' }, { num: 3, label: 'MANUAL FCTNS', act: 'na' },
+      { num: 2, label: 'TEST CYCLE', act: 'na' }, { num: 3, label: 'MANUAL FCTNS', act: 'manual' },
       { num: 4, label: 'ALARM', fly: [{ num: 1, label: 'Alarm Log', act: 'alarm' }, ...naItems([null, 'Motion Log', 'System Log', 'Appl Log', 'Comm Log']).slice(1)] },
       { num: 5, label: 'I/O', fly: io },
-      { num: 6, label: 'SETUP', fly: [{ num: null, label: 'Frames', act: 'na' }] },   // only Frames is confirmed by the manual
+      { num: 6, label: 'SETUP', fly: ['Prog Select', 'ZDT Client', 'General', 'Frames', 'Macro', 'Ref Position', 'Port Init', 'Ovrd Select', 'User Alarm'].map((l, i) => ({ num: i + 1, label: l, act: l === 'Macro' ? 'macro' : 'na' })) },   // manual p279 figure (page 1; only Macro is built)
       { num: 7, label: 'FILE', fly: [] },   // contents not in the manual
       { num: 8, blank: true }, { num: 9, label: 'USER', act: 'na' }, { num: 0, label: '-- NEXT --', act: 'next' }];
     const page2 = [   // unverified: only the two items the manual names, positions unknown
@@ -915,6 +955,8 @@ const TPController = (() => {
     return { id: 'menu', titleFmt: p => `MENU   ${p}`, pages: [page1, page2], onPick: x => {
       const a = x.act;
       if (a === 'alarm') ctl.open(new AlarmScreen(ctl));
+      else if (a === 'macro') ctl.open(new MacroScreen(ctl));
+      else if (a === 'manual') ctl.open(new ManualMacroScreen(ctl));
       else if (a === 'posn') ctl.open(new PosnScreen(ctl));
       else if (a && a.startsWith('io:')) { ctl.ioView = { kind: a[3], dir: ctl.ioView.dir }; ctl.open(new IOScreen(ctl)); }
       else ctl.na(x.label);
@@ -1051,7 +1093,7 @@ const TPController = (() => {
         return [S(`   ${i + 1} ${padR(label, 16)}`), ...(i === 0 ? v : [S('['), ...v, S(']')])];
       };
       return ['  Creation Date:', '  Modification Date:', '  Copy Source:', `  Positions: ${npos ? 'TRUE ' : 'FALSE'}   Size: ${padL(size, 6)} Byte`, '  Program name:',
-        f(0, '', e.name), f(1, 'Sub type:', padR('None', 16)), f(2, 'Comment:', padR(c.commentOf(this.name), 16)), f(3, 'Group mask:', padR('1,*,*,*,*,*,*,*', 16)),
+        f(0, '', e.name), f(1, 'Sub type:', padR(subtypeOf(e), 16)), f(2, 'Comment:', padR(c.commentOf(this.name), 16)), f(3, 'Group mask:', padR('1,*,*,*,*,*,*,*', 16)),
         f(4, 'Write protect:', padR('OFF', 16)), f(5, 'Ignore pause:', padR('OFF', 16)), f(6, 'Stack size:', padR(' 500', 16))];   // row 8 (Collection) is off screen
     }
     softkeys() { return ['END', 'PREV', 'NEXT', '[CHOICE]', '']; }
@@ -1063,7 +1105,13 @@ const TPController = (() => {
       else if (k === 'F2' || k === 'F3') {
         const L = (c.host.listPrograms ? c.host.listPrograms() : []).slice().sort(), i = L.indexOf(this.name);
         const j = clamp(i + (k === 'F2' ? -1 : 1), 0, L.length - 1); if (L[j]) this.name = L[j];
-      } else if (k === 'F4') { if (this.row !== 0 && this.row !== 2) c.msg = NA; }
+      } else if (k === 'F4') {
+        if (this.row === 1) {   // manual p276: [CHOICE] on the Sub type line (None, Macro, Cond, Collection)
+          if (!c.canEdit()) return;
+          c.showMenu({ title: 'Sub type', titleFmt: () => 'Sub type', pages: [['None', 'Macro', 'Cond', 'Collection'].map(l => ({ label: l }))],
+            onPick: x => { c.popup = null; if (x.label === 'Cond' || x.label === 'Collection') c.msg = NA; else setSubtype(c, this.name, x.label); } });
+        } else if (this.row !== 0 && this.row !== 2) c.msg = NA;
+      }
       else if (k === 'ENTER') {
         if (!c.canEdit()) return;
         const e = c.loadProg(this.name); if (!e) return;
@@ -1366,7 +1414,7 @@ const TPController = (() => {
       const c = this.ctl;
       if (!c.canEdit()) return;
       const pickSub = spec => c.showMenu({ ...spec, onPick: x => this.instPick(x) });
-      c.showMenu({ ...INST, onPick: x => { if (!x.tpl) { c.popup = null; c.msg = NA; return; } pickSub(INST_SUB[x.tpl.slice(2)]); } });
+      c.showMenu({ ...INST, onPick: x => { if (!x.tpl) { c.popup = null; c.msg = NA; return; } if (x.tpl === 'M:macro') return this.macroInst(); pickSub(INST_SUB[x.tpl.slice(2)]); } });
     }
     instPick(x) {
       const c = this.ctl; c.popup = null;
@@ -1375,6 +1423,14 @@ const TPController = (() => {
       this.modify(e => { this.writeLine('', toks.some(t => t.slot) ? toks : null); if (!toks.some(t => t.slot)) e.lines[this.cur.line - 1] = { text: x.tpl, tpl: null }; });
       this.cur.col = 1;
       this.nextSlot();
+    }
+    // [INST] > MACRO (manual p282-283): pick a macro by its instruction name; the line is just that name, which runs like a CALL
+    macroInst() {
+      const c = this.ctl, s = c.settings;
+      const names = Object.keys(s.macros).filter(k => s.macros[k] && MACRO_NAME.test(k));
+      if (!names.length) { c.popup = null; c.msg = 'No macros in the macro table'; return; }   // unverified: prompt text
+      const pages = []; for (let i = 0; i < names.length; i += 7) pages.push(names.slice(i, i + 7).map(n => ({ label: n })));
+      c.showMenu({ title: 'MACRO', next: 8, pages, onPick: x => { c.popup = null; this.modify(() => { this.writeLine(x.label, null); }); } });   // unverified: menu title
     }
     tplFieldsOf() { const L = this.lineObj(); return L && L.tpl ? tplFields(L.tpl) : []; }
     // Move to the first unfilled slot on the line and start it; finish the line when all are filled
@@ -1675,6 +1731,132 @@ const TPController = (() => {
         else if (lab === 'UNSIM') c.setSim(key, false);
         else if (lab === 'ON' || lab === 'OFF') c.setIO(key, lab === 'ON');
       }
+    }
+  }
+
+  // SETUP > Macro (manual p279-281): instruction name, program, assignment type and number per row
+  const ASSIGN_TYPES = [['--', 'UK', 'SU', 'MF', 'SP', 'DI', 'RI'], ['UI']];   // manual p281 figure; page 2 also lists FLAG and MARKER, which are not built
+  class MacroScreen {
+    constructor(ctl) { this.ctl = ctl; this.row = 0; this.col = 1; this.top = 0; }
+    keys() { return Object.keys(this.ctl.settings.macros); }
+    title() { return 'Macro Command'; }
+    titleRight() { return `${this.row + 1}/150`; }
+    body() {
+      const c = this.ctl, s = c.settings, keys = this.keys(), vis = ROWS - 1;
+      if (this.row < this.top) this.top = this.row; if (this.row >= this.top + vis) this.top = this.row - vis + 1;
+      const clip = (t, w) => (t.length > w ? t.slice(0, w - 1) + '>' : padR(t, w));
+      const rows = ['        Instruction name       Program      Assign'];
+      for (let i = this.top; i < Math.min(150, this.top + vis); i++) {
+        const k = keys[i], a = (k && s.macroAssign[k]) || { type: '--', num: 0 }, cur = i === this.row;
+        const st = col => (cur && this.col === col ? 'cursor' : undefined);
+        const nb = cur && this.col === 3 && c.num && c.num.target === 'macnum' ? c.num.buf + '_' : String(a.num);
+        const nameSegs = cur && this.col === 0 && c.text ? c.text.segments(16) : [S(clip(k || '', 16), st(0))];
+        rows.push([S(`${padL(i + 1, 4)} [`), ...nameSegs, S(']['), S(clip(k ? s.macros[k] || '' : '', 12), st(1)), S(']'), S(a.type, st(2)), S('['), S(padL(nb, 5), st(3)), S(']')]);
+      }
+      return rows;
+    }
+    softkeys() { return ['[ TYPE ]', 'CLEAR', '', this.col === 1 || this.col === 2 ? '[CHOICE]' : '', '']; }
+    key(k) {
+      const c = this.ctl, s = c.settings, key = this.keys()[this.row];
+      if (k === 'UP') this.row = Math.max(0, this.row - 1);
+      else if (k === 'DOWN') this.row = Math.min(149, this.row + 1);
+      else if (k === 'LEFT') this.col = Math.max(0, this.col - 1);
+      else if (k === 'RIGHT') this.col = Math.min(3, this.col + 1);
+      else if (k === 'F1') c.msg = NA;
+      else if (k === 'F2') {   // unverified: CLEAR empties the whole row
+        if (!key || !c.canEdit()) return;
+        delete s.macros[key]; delete s.macroAssign[key]; this.changed();
+      } else if (k === 'ENTER' && this.col === 0) {
+        if (!c.canEdit()) return;
+        c.startText({ init: key || '', max: 16, prompt: 'Enter macro name', done: v => this.setName(key, v) });   // unverified: prompt text and max length
+      } else if (k === 'F4' && this.col === 1) { if (c.canEdit()) this.chooseProgram(key); }
+      else if (k === 'F4' && this.col === 2) { if (!key) c.msg = 'Enter a program first'; else if (c.canEdit()) this.chooseType(key); }   // unverified: prompt text
+      else if (this.col === 3 && DIGIT[k] && /\d/.test(DIGIT[k])) {
+        if (!key) { c.msg = 'Enter a program first'; return; }
+        if (!c.canEdit()) return;
+        c.startNum({ init: DIGIT[k], target: 'macnum', done: v => this.setNum(key, Math.round(+v)) });
+      }
+    }
+    changed() { this.ctl.regChanged(); }
+    // Rebuild the table object in place so the host keeps its reference and the row keeps its position
+    rekey(old, nw, prog) {
+      const s = this.ctl.settings, ent = Object.entries(s.macros);
+      for (const [k] of ent) delete s.macros[k];
+      for (const [k, v] of ent) {
+        if (k !== old) { s.macros[k] = v; continue; }
+        s.macros[nw] = prog;
+        if (s.macroAssign[old] && old !== nw) { s.macroAssign[nw] = s.macroAssign[old]; delete s.macroAssign[old]; }
+      }
+    }
+    setName(old, text) {
+      const c = this.ctl, s = c.settings, t = text.trim();
+      if (!t) return true;
+      if (!MACRO_NAME.test(t)) { c.msg = 'Invalid macro name'; return false; }   // unverified: the manual has no naming rules, but the .ls macro line needs letters, digits, _ and spaces
+      const nk = C.macroKey(t);
+      if (nk !== old && s.macros[nk] != null) { c.msg = 'The same macro name already exists'; return false; }
+      if (old) this.rekey(old, nk, s.macros[old]);
+      else { s.macros[nk] = ''; this.row = this.keys().indexOf(nk); }   // unverified: a name without a program is kept (empty program) and new rows join the end of the table
+      this.changed(); return true;
+    }
+    chooseProgram(key) {
+      const c = this.ctl, s = c.settings;
+      const show = onlyMacro => {
+        const L = (c.host.listPrograms ? c.host.listPrograms() : []).slice().sort().filter(n => !onlyMacro || subtypeOf(c.loadProg(n)).toLowerCase() === 'macro');
+        const pages = []; for (let i = 0; i < Math.max(1, L.length); i += 7) pages.push(L.slice(i, i + 7).map(n => ({ label: n })));
+        c.showMenu({ title: 'PROGRAM', next: 8, pages, softkeys: ['PROGRAM', 'MACRO', 'COLLECT', 'INDIRECT', 'STRINGS'],
+          fkey: n => { if (n === 1) show(false); else if (n === 2) show(true); else { c.popup = null; c.msg = NA; } },
+          onPick: x => {
+            c.popup = null;
+            const prog = x.label;
+            if (key) s.macros[key] = prog;
+            else {   // an empty row takes the program's name as the instruction name (manual p280)
+              const nk = C.macroKey(prog);
+              if (s.macros[nk] != null) { c.msg = 'The same macro name already exists'; return; }
+              s.macros[nk] = prog; this.row = this.keys().indexOf(nk);
+            }
+            setSubtype(c, prog, 'Macro');   // manual p276: a program placed in the table becomes a Macro program
+            this.changed();
+          } });
+      };
+      show(false);
+    }
+    chooseType(key) {
+      const c = this.ctl, s = c.settings;
+      c.showMenu({ title: 'Assign', titleFmt: p => `Assign   ${p}`, next: 8, pages: ASSIGN_TYPES.map(p => p.map(l => ({ label: l }))),
+        onPick: x => {
+          c.popup = null;
+          const a = s.macroAssign[key] || (s.macroAssign[key] = { type: '--', num: 0 });
+          a.type = x.label; if (x.label === '--') a.num = 0;
+          this.changed();
+        } });
+    }
+    setNum(key, n) {
+      const c = this.ctl, s = c.settings, a = s.macroAssign[key] || (s.macroAssign[key] = { type: '--', num: 0 });
+      const max = a.type === 'UK' || a.type === 'SU' ? 7 : 999;   // manual: seven user keys; DI indexes to 999
+      if (a.type === '--') { c.msg = 'Choose the assignment type first'; return; }   // unverified: prompt text
+      if (!(n >= 0 && n <= max)) { c.msg = 'Value out of range'; return; }   // unverified: prompt text
+      a.num = n; this.changed();
+    }
+  }
+
+  // MENU > MANUAL FCTNS (manual p278): the macros assigned as MF[n], run with SHIFT + EXEC (F3)
+  class ManualMacroScreen {
+    constructor(ctl) { this.ctl = ctl; this.row = 0; }
+    list() { const s = this.ctl.settings; return Object.keys(s.macros).filter(k => s.macroAssign[k] && s.macroAssign[k].type === 'MF').sort((a, b) => s.macroAssign[a].num - s.macroAssign[b].num); }
+    title() { return 'MANUAL Macros'; }
+    titleRight() { const n = this.list().length; return n ? `${Math.min(this.row + 1, n)}/${n}` : ''; }
+    body() {
+      const L = this.list(); this.row = clamp(this.row, 0, Math.max(0, L.length - 1));
+      return ['    Instruction', ...L.slice(0, ROWS - 1).map((k, i) => [S(`${padL(i + 1, 4)} `), S(k, i === this.row ? 'cursor' : undefined)])];
+    }
+    prompt() { return 'Press SHIFT-EXEC(F3) to run program'; }
+    softkeys() { return ['[ TYPE ]', '', 'EXEC', '', '']; }
+    key(k, shift) {
+      const c = this.ctl, L = this.list();
+      if (k === 'UP') this.row = Math.max(0, this.row - 1);
+      else if (k === 'DOWN') this.row = Math.min(L.length - 1, this.row + 1);
+      else if (k === 'F1') c.msg = NA;
+      else if (k === 'F3' && shift && L[this.row]) c.runMacro(L[this.row], false);
     }
   }
 

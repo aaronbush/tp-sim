@@ -548,5 +548,114 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
   h.c.selectProgram('NM'); h.press('EDIT');
   check('6 PR and R comments from DATA show in the program', h.has('PR[1:HOME] 100% FINE') && h.has('Offset,PR[10:shift]') && h.has('R[2:count]=R[2:count]+1'), h.text());
   check('6 the stored line is unchanged', h.host.getProgram('NM').lines[0] === 'J PR[1] 100% FINE'); }
+// ===== 12. Macros: SETUP > Macro table, INST > MACRO, MANUAL FCTNS, user keys, running programs with macro lines =====
+{ const h = rig(['grip_open.ls', 'grip_close.ls', 'pick_part.ls']).ready();
+  const pick = label => { const its = h.c.popup.items(); h.c.popup.row = its.findIndex(x => x.label === label); h.press('ENTER'); };
+  const S = h.host.settings;
+  h.press('MENU', 'D6', 'D5');
+  check('12 MENU > SETUP > Macro opens the Macro Command table', h.has('Macro Command') && h.has('Instruction name') && h.has('1/150'), h.text());
+  check('12 soft keys: TYPE, CLEAR, CHOICE', h.has('[[ TYPE ]] [CLEAR] [] [[CHOICE]] []'), h.text());
+  // row 1: program from the [CHOICE] list, then a descriptive instruction name
+  h.press('F4');
+  check('12 [CHOICE] on Program lists programs with PROGRAM / MACRO soft keys', h.has('GRIP_OPEN') && h.has('[PROGRAM] [MACRO]'), h.text());
+  pick('GRIP_OPEN');
+  check('12 choosing a program fills the instruction name and sets the Macro sub type', S.macros.GRIP_OPEN === 'GRIP_OPEN' && /^\/PROG\s+GRIP_OPEN\s+Macro/.test(h.host.getProgram('GRIP_OPEN').header));
+  h.press('LEFT', 'ENTER');
+  for (let i = 0; i < 9; i++) h.press('BACKSPACE');
+  h.ctl.dispatch({ type: 'text', text: 'Open hand 1' }); h.press('ENTER');
+  check('12 renaming the entry keeps its program (names are stored upper case)', S.macros['OPEN HAND 1'] === 'GRIP_OPEN' && !('GRIP_OPEN' in S.macros) && h.has('[OPEN HAND 1'), h.text());
+  h.press('RIGHT', 'RIGHT', 'F4');
+  check('12 [CHOICE] on Assign lists the types', h.has('1 --') && h.has('2 UK') && h.has('3 SU') && h.has('4 MF') && h.has('7 RI') && h.has('8 --next page--'), h.text());
+  h.press('D4', 'RIGHT'); h.num('1');
+  check('12 MF[1] assignment stored beside the macro table', JSON.stringify(S.macroAssign['OPEN HAND 1']) === '{"type":"MF","num":1}' && h.has('MF[[[    1]]]'), h.text());
+  // row 2: close hand as MF[2]
+  h.c.top().row = 1; h.c.top().col = 1; h.press('F4'); pick('GRIP_CLOSE');
+  h.press('LEFT', 'ENTER'); for (let i = 0; i < 10; i++) h.press('BACKSPACE');
+  h.ctl.dispatch({ type: 'text', text: 'Close hand 1' }); h.press('ENTER');
+  h.press('RIGHT', 'RIGHT', 'F4', 'D4', 'RIGHT'); h.num('2');
+  // rows 3, 4: user keys (open on SHIFT+user key 1, close on user key 2 alone)
+  h.c.top().row = 2; h.c.top().col = 1; h.press('F4'); pick('GRIP_OPEN');
+  h.press('RIGHT', 'F4', 'D3', 'RIGHT'); h.num('1');
+  h.c.top().row = 3; h.c.top().col = 1; h.press('F4'); pick('GRIP_CLOSE');
+  h.press('RIGHT', 'F4', 'D2', 'RIGHT'); h.num('2');
+  check('12 four entries, shared table keeps {NAME: PROGRAM}', JSON.stringify(S.macros) === '{"OPEN HAND 1":"GRIP_OPEN","CLOSE HAND 1":"GRIP_CLOSE","GRIP_OPEN":"GRIP_OPEN","GRIP_CLOSE":"GRIP_CLOSE"}', JSON.stringify(S.macros));
+  h.c.top().row = 2; h.c.top().col = 1; h.press('F2');
+  check('12 the same program can sit in the table twice; CLEAR empties a row', !('GRIP_OPEN' in S.macros) && !S.macroAssign.GRIP_OPEN);
+  h.c.top().row = 3; h.c.top().col = 1; h.press('F4'); pick('GRIP_OPEN');
+  h.press('RIGHT', 'F4', 'D3', 'RIGHT'); h.num('1');
+  h.c.top().row = 3; h.c.top().col = 0; h.press('ENTER'); h.ctl.dispatch({ type: 'text', text: ' x' }); for (let i = 0; i < 12; i++) h.press('BACKSPACE'); h.ctl.dispatch({ type: 'text', text: 'Open hand 1' }); h.press('ENTER');
+  check('12 a duplicate instruction name is refused', /same macro name already exists/.test(h.text()) && S.macros.GRIP_OPEN === 'GRIP_OPEN', h.text());
+  h.press('PREV'); if (h.c.text) h.press('PREV');
+  // MANUAL FCTNS
+  h.c.out = {}; h.c.closeOverlays();
+  h.press('MENU', 'D3');
+  check('12 MENU > MANUAL FCTNS lists the MF macros by instruction name', h.has('MANUAL Macros') && h.has('OPEN HAND 1') && h.has('CLOSE HAND 1'), h.text());
+  check('12 prompt and EXEC soft key', h.has('Press SHIFT-EXEC(F3) to run program') && h.has('[[ TYPE ]] [] [EXEC]'), h.text());
+  h.press('F3'); h.tick(500, 5);
+  check('12 EXEC without SHIFT does nothing', h.st().runState === 'ABORTED' && !h.c.out['RO[1]']);
+  h.down('SHIFT'); h.press('F3');
+  check('12 SHIFT+EXEC runs the macro program', h.st().runState === 'RUNNING' && h.st().program === 'GRIP_OPEN');
+  h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
+  check('12 the macro turned RO[1] on', h.c.out['RO[1]'] === 1);
+  h.press('DOWN'); h.down('SHIFT'); h.press('F3'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
+  check('12 second MANUAL FCTNS entry (close) turned RO[1] off', h.c.out['RO[1]'] === 0);
+  // conditions: deadman released raises the same alarm as other motion requests
+  h.dm('released'); h.press('RESET'); h.dm('held'); h.press('RESET');
+  h.down('SHIFT'); h.dm('released');
+  h.press('F3');
+  check('12 deadman released: SRVO-003, nothing runs', h.st().alarm === 'SRVO-003 Deadman switch released' && h.st().runState === 'ABORTED');
+  h.up('SHIFT'); h.dm('held'); h.press('RESET');
+  // user keys
+  h.c.out = {}; h.press('DISP');
+  h.down('SHIFT'); h.press('TOOL1'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
+  check('12 SHIFT + TOOL 1 runs the SU[1] macro', h.c.out['RO[1]'] === 1);
+  h.press('TOOL2'); h.tickUntil(() => h.st().runState === 'ABORTED');
+  check('12 TOOL 2 alone runs the UK[2] macro (no SHIFT needed)', h.c.out['RO[1]'] === 0 && h.st().runState === 'ABORTED');
+  h.press('TOOL1');
+  check('12 an unassigned user key keeps its normal screen', h.has('TOOL 1') && h.has('Not available in the trainer'));
+  // paused program: refused with the existing run-request path
+  progHost(h, 'WT', ['R[2]=1', 'WAIT 5.00(sec)', 'R[2]=2']); h.c.selectProgram('WT');
+  h.down('SHIFT'); h.press('FWD'); h.tick(200, 3); h.up('SHIFT');
+  check('12 (setup) WT paused in its WAIT', h.st().runState === 'PAUSED');
+  h.press('MENU', 'D3'); h.down('SHIFT'); h.press('F3'); h.up('SHIFT');
+  check('12 a macro request while a program is paused is refused (PROG-040 / INTP-105)', /INTP-105/.test(h.st().alarm) && h.c.run.state === 'PAUSED' && h.c.run.root === 'WT');
+  // other modes
+  h.c.abortAll(); h.press('RESET');
+  h.mode('AUTO'); h.c.out = {};
+  h.press('MENU', 'D3'); h.down('SHIFT'); h.press('F3'); h.tick(200, 3); h.up('SHIFT');
+  check('12 manual-mode macros do not run in AUTO', h.st().runState === 'ABORTED' && !h.c.out['RO[1]']);
+}
+// [INST] > MACRO inserts the macro's instruction name as a line that core.js reads as a macro
+{ const h = rig(['grip_open.ls']).ready();
+  h.host.settings.macros = { 'OPEN HAND 1': 'GRIP_OPEN' }; h.host.settings.macroAssign = {};
+  progHost(h, 'MN', ['R[1]=1', 'R[2]=2']); h.c.selectProgram('MN'); h.press('EDIT'); h.press('DOWN');
+  h.press('NEXT', 'F1', 'D8', 'D6');
+  check('12 [INST] page 2 > MACRO lists the macro names', h.has('MACRO') && h.has('OPEN HAND 1'), h.text());
+  h.press('ENTER');
+  const L = h.lines('MN');
+  check('12 the line is the instruction name', L.length === 2 && L[1] === 'OPEN HAND 1', JSON.stringify(L));
+  const prog = core.parseLS(core.toLS({ name: 'MN', header: h.host.store.MN.header, lines: L, posText: '' }));
+  check('12 it parses as a macro instruction and round-trips through toLS/parseLS', prog.ins[1].type === 'macro' && prog.ins[1].name === 'OPEN HAND 1' && prog.lines[1] === 'OPEN HAND 1', JSON.stringify(prog.lines));
+  h.host.settings.macros = {}; h.press('F1', 'D8', 'D6');
+  check('12 an empty macro table says so', /No macros/.test(h.text()), h.text()); }
+// A program with macro lines runs from the pendant and ends where core.runSim says
+{ const h = rig(['grip_open.ls', 'grip_close.ls', 'pick_part.ls']).ready();
+  progHost(h, 'MAIN', ['CALL PICK_PART(60)', 'OPEN HAND', 'R[3]=1']);
+  h.host.settings.macros = { 'CLOSE HAND': 'GRIP_CLOSE', 'OPEN HAND': 'GRIP_OPEN' };
+  h.c.selectProgram('MAIN');
+  h.down('SHIFT'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'ABORTED', 100, 20000); h.up('SHIFT');
+  const ref = core.runSim('MAIN', h.c.allParsed(), { tools: { 1: [0, 0, 100, 0, 0, 0] }, uframes: {}, pr: {}, r: {}, inputs: {}, comp: 3, tol: 1, maxTime: 600, macros: h.host.settings.macros });
+  const last = ref.snaps[ref.snaps.length - 1];
+  check('12 pick_part + macro lines: runs to the end with no macro-setup issue', ref.stopReason === 'end' && !ref.issues.some(i => /isn't set up/.test(i.title)) && h.st().runState === 'ABORTED' && h.host.settings.r[3] === 1, JSON.stringify([ref.stopReason, h.st().runState, ref.issues.map(i => i.title)]));
+  check('12 outputs and final pose match core.runSim', h.c.out['RO[1]'] === last.out['RO[1]'] && last.out['RO[1]'] === 1 && near(h.ctl.robot().q, ref.T.q[ref.T.q.length - 1], 1e-3), JSON.stringify([h.c.out, last.out]));
+  // step mode walks into the macro's program
+  h.c.stepMode = true; h.c.cursorOf('MAIN').line = 2; h.c.out = {};
+  h.down('SHIFT'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'PAUSED', 100, 2000);
+  check('12 STEP: the macro line is its own step, like a CALL line', h.st().program === 'MAIN' && h.st().line === 2, JSON.stringify(h.st()));
+  h.press('FWD'); h.tickUntil(() => h.st().runState === 'PAUSED', 100, 2000);
+  check('12 STEP: the next step is line 1 of the macro program', h.st().program === 'GRIP_OPEN' && h.st().line === 1, JSON.stringify(h.st()));
+  h.press('FWD'); h.tickUntil(() => h.st().runState === 'PAUSED', 100, 2000); h.up('SHIFT');
+  check('12 STEP: then line 2, with RO[1] already on', h.st().program === 'GRIP_OPEN' && h.st().line === 2 && h.c.out['RO[1]'] === 1, JSON.stringify([h.st(), h.c.out]));
+ }
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

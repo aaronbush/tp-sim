@@ -13,11 +13,13 @@ Status as of the hand-off (2026-10-30). Check open PRs and issues on GitHub firs
 
 ## Pendant trainer (see docs/PENDANT.md)
 
+Every gap, feature by feature, is in [COVERAGE.md](COVERAGE.md).
+
 In the app as Pendant mode. Known limits:
 
 - **SHIFT+BWD** only walks back within the paused run's path.
 - **Re-simulation inside a CALLed program** (after an edit, I/O change or WAIT) doesn't return to the caller.
-- **Not available:** editing the default motion instructions, Circle Arc, `FOR`/`ENDFOR`, macros, `SKIP`, Find, Replace and Renumber; frame setup (three-point method); most menu entries (they show "Not available in the trainer").
+- **Not available:** editing the default motion instructions, Circle Arc, `FOR`/`ENDFOR`, `SKIP`, Find, Replace and Renumber; frame setup (three-point method); most menu entries (they show "Not available in the trainer").
 - **Start values.** Live register / PR / input values written by the pendant are the same values the simulator starts from; there is no separate pendant state yet.
 - **Pendant UI:** the third key of the numeric block is a half-key pair (`,` and `-`) because the two scans disagree; the left SHIFT is the one `data-key="SHIFT"`. The software keyboard is the physical keyboard (no on-screen keyboard). Controller cabinet keys have no keyboard shortcuts. Test on real touch hardware.
 
@@ -40,7 +42,7 @@ In the app as Pendant mode. Known limits:
   - system variables (`$...`)
   - `MESSAGE`, `PAYLOAD`, `UALM`, `RSR`
   - string registers (`SR[ ]`); text arguments work only for `=` / `<>` checks
-  - macros run from DI/UI buttons or the MANUAL FCTNS menu (only macro lines in a program run)
+  - macros fired by DI/RI/UI/SOP inputs (macro lines in programs run; the pendant runs MF and user-key macros by hand)
   - background logic
   - multiple motion groups
   - `JMP` into or out of `FOR` blocks (works naively)

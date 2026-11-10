@@ -59,6 +59,8 @@ TPController.ROWS, TPController.COLS   // body size: always exactly 12 rows, eac
                                   //   rCmt/prCmt/inputs, so the host can save them
 ```
 
+What is built and what isn't, feature by feature, is in [COVERAGE.md](COVERAGE.md).
+
 The controller treats `settings.r`, `settings.pr` and `settings.inputs` as the controller's live
 register, position register and simulated-input values: DATA edits, PR RECORD, I/O simulation and
 program runs write into them.
@@ -128,6 +130,14 @@ name entry is open the `popup` is the `Alpha input 1` list. Only `'cursor'` is u
 10. I/O screens: view and simulate digital I/O.
 11. Test running: STEP on/off, SHIFT+FWD, SHIFT+BWD, HOLD, release-to-pause, abort from FCTN,
     continuous run, cursor and status tracking.
+
+## Macros (manual ch. 16, image pages p291-p299)
+
+- **Table.** `settings.macros` is `{ 'INSTRUCTION NAME': 'PROGRAM' }` (names normalised by core.js `macroKey`, so upper case) and is the same table as Settings > Macros and the macro lines the simulator runs. Assignments live beside it in `settings.macroAssign = { 'INSTRUCTION NAME': { type, num } }` with `type` one of `--`, `UK`, `SU`, `MF`, `SP`, `DI`, `RI`, `UI`. The controller calls `host.settingsChanged()` after a change; the page then re-runs so the Macros panel follows.
+- **SETUP > Macro** (MENU > SETUP > Macro): columns Instruction name / Program / Assign; F4 [CHOICE] on Program lists programs (F2 MACRO: only programs with sub type Macro) and fills the name when the row is empty; F4 on the type column picks UK, SU, MF, SP, DI, RI (page 2: UI); the number is typed; CLEAR empties the row. A program put in the table gets sub type Macro (`/PROG  NAME<TAB>Macro` in the header).
+- **[INST] > MACRO** inserts the instruction name as the line; core.js reads it as a macro and it runs like a CALL.
+- **Running by hand.** MENU > MANUAL FCTNS lists the MF macros; SHIFT+EXEC (F3) runs one. Teach-pendant keys: TOOL 1, TOOL 2, MOVE MENU, SETUP, STATUS, I/O, POSN are user keys 1-7; pressed alone they run the UK macro (it may not move the robot), with SHIFT the SU macro. A macro runs through the same machinery as SHIFT+FWD: TP on, T1/T2, deadman (SRVO-003 otherwise), no fault. A UK macro needs no SHIFT or deadman once started.
+- **Not built:** macros fired by DI/RI/UI/SOP inputs (the assignment is stored only), FLAG/MARKER assignment types, system macros.
 
 Later: frame setup (three-point method), AUTO-mode production start details, lessons with hints.
 
@@ -236,3 +246,15 @@ Each of these is marked `// unverified:` in `site/js/controller.js`. Check them 
 - [pendant UI] The scans disagree on the third key of the `0 .` row (comma on p059/p060, minus on p187) and on
   the bottom-left key (minus vs DIAG/HELP). The face follows p187 and splits that cell into `,` and `-` half keys.
 - [pendant UI] The status-bar "FBD" marker is drawn in the screen's title bar, not literally at the top-left.
+
+**Macros**
+
+- [macro] Does a macro request while a program is paused (or running) have a defined behaviour? — Refused with PROG-040 / INTP-105 while paused, ignored while running.
+- [macro] Table starts empty; the manual's figure shows default rows (Open/Close/Relax hand 1 and 2 on MF 1-3, 11-13). — Not seeded. New entries join the end of the table (the cursor row isn't kept), and a name entered without a program is stored with an empty program.
+- [macro] Instruction names are shown upper case (the table is keyed by `macroKey`), where the manual shows mixed case; names are limited to letters, digits, `_` and spaces (so the `.ls` macro line reads back), max 16 characters.
+- [macro] Column widths and header spacing of the Macro Command table, which columns show [CHOICE], CLEAR (assumed: empties the whole row), the [TYPE] list on F1, and the ranges for assignment numbers (assumed 1-7 for UK/SU, to 999 otherwise).
+- [macro] Assigning the same program twice: the manual says the second name is left blank with a message. — The second entry is refused with that message instead (no blank-name rows).
+- [macro] Titles and prompts: the INST > MACRO menu title, "No macros in the macro table", the MANUAL FCTNS screen when nothing is assigned (empty list).
+- [macro] UK macros that move the robot: the manual says they cannot; it doesn't say what the pendant shows. — A prompt refuses it; the group-mask rule isn't checked.
+- [macro] Releasing SHIFT while an SU / MF macro runs pauses it, as for a test run; the macro program then blocks other programs until aborted.
+
