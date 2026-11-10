@@ -541,5 +541,12 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
   check('11 NO leaves it paused and asks again next time', h.st().runState === 'PAUSED' && /Run from line 4 instead?/.test(h.text()));
   h.press('F4'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
   check('11 YES then SHIFT+FWD runs from the cursor line', h.host.settings.r[3] === 7 && h.host.settings.r[1] === 1); }
+// Register comments from the DATA screens show in program lines
+{ const h = rig().ready();
+  progHost(h, 'NM', ['J PR[1] 100% FINE', 'L P[1] 100mm/sec FINE Offset,PR[10:old]', 'R[2]=R[2]+1']);
+  h.host.settings.prCmt = { 1: 'HOME', 10: 'shift' }; h.host.settings.rCmt = { 2: 'count' };
+  h.c.selectProgram('NM'); h.press('EDIT');
+  check('6 PR and R comments from DATA show in the program', h.has('PR[1:HOME] 100% FINE') && h.has('Offset,PR[10:shift]') && h.has('R[2:count]=R[2:count]+1'), h.text());
+  check('6 the stored line is unchanged', h.host.getProgram('NM').lines[0] === 'J PR[1] 100% FINE'); }
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

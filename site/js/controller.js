@@ -585,6 +585,11 @@ const TPController = (() => {
       return v6.slice(0, 3).every((v, i) => Math.abs(v - pr.v[i]) < 0.1);
     }
     selectProgram(name) { this.selected = name; }
+    // R[ ] and PR[ ] are shown with the comment set on the DATA screens, e.g. PR[1:HOME]; a comment written in the line is kept when the register has none
+    named(text) {
+      const s = this.settings;
+      return text.replace(/\b(PR|R)\[(\d+)((?:,\d+)?)(?::[^\]]*)?\]/g, (all, k, n, el) => { const cm = ((k === 'R' ? s.rCmt : s.prCmt) || {})[n]; return cm ? `${k}[${n}${el}:${cm}]` : all; });
+    }
     // Choosing a different program on the pendant: start at line 1, and let go of the deadman so the
     // student has to grip it again on purpose before anything moves.
     switchProgram(name) {
@@ -1099,7 +1104,7 @@ const TPController = (() => {
       const c = this.ctl, e = this.ed, L = e.lines[i], n = i + 1;
       const fields = [{ kind: 'num' }], rows = [[{ text: `${padL(n, 4)}:`, f: 0 }]];
       const add = (text, field, row) => { const r = rows[row || 0] || (rows[row || 0] = []); if (field) { fields.push(field); r.push({ text, f: fields.length - 1 }); } else r.push({ text }); };
-      const disp = r => (c.showCmt ? r : r.replace(/:[^\]]*\]/, ']'));
+      const disp = r => (c.showCmt ? c.named(r) : r.replace(/:[^\]]*\]/g, ']'));
       if (L.tpl) {
         add('   ');
         const walk = (toks, parent) => {
@@ -1122,12 +1127,12 @@ const TPController = (() => {
           add(disp(m.pos), { kind: 'pos', which: 'pos' }, 1);
           if (m.speed) { add(' ', null, 1); add(m.speed, { kind: 'speed' }, 1); }
           if (m.term) { add(' ', null, 1); add(m.term, { kind: 'term' }, 1); }
-          if (m.opts) add(' ' + m.opts, null, 1);
+          if (m.opts) add(' ' + disp(m.opts), null, 1);
         } else {
           add(at); add(disp(m.pos), { kind: 'pos', which: 'pos' });
           if (m.speed) { add(' '); add(m.speed, { kind: 'speed' }); }
           if (m.term) { add(' '); add(m.term, { kind: 'term' }); }
-          if (m.opts) add(' ' + m.opts);
+          if (m.opts) add(' ' + disp(m.opts));
         }
         return { fields, rows, m };
       }
@@ -1135,7 +1140,15 @@ const TPController = (() => {
       if (!t || /^(!|\/\/)/.test(t)) { add(t); return { fields, rows }; }
       const gf = genericFields(t);
       let p = 0;
-      for (const g of gf) { if (g.s > p) add(disp(t.slice(p, g.s))); add(t.slice(g.s, g.e), { kind: g.kind, s: g.s, e: g.e }); p = g.e; }
+      for (const g of gf) {
+        if (g.s > p) add(disp(t.slice(p, g.s)));
+        add(t.slice(g.s, g.e), { kind: g.kind, s: g.s, e: g.e }); p = g.e;
+        if (g.kind !== 'idx' || !c.showCmt) continue;
+        // the number is its own field, so the DATA-screen comment is added to the text after it: R[2 -> R[2:count]
+        const reg = /(?:^|[^A-Za-z])(PR|R)\[$/.exec(t.slice(0, g.s)), tail = /^((?:,\d+)?)(?::[^\]]*)?\]/.exec(t.slice(p));
+        const cm = reg && tail && ((reg[1] === 'R' ? c.settings.rCmt : c.settings.prCmt) || {})[t.slice(g.s, g.e)];
+        if (cm) { add(`${tail[1]}:${cm}]`); p += tail[0].length; }
+      }
       if (p < t.length) add(disp(t.slice(p)));
       return { fields, rows };
     }
