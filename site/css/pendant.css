@@ -183,3 +183,4 @@
 .tp-strip .pe[aria-pressed="true"] { background: var(--tp-estop-edge); box-shadow: 0 0 0 .6cqw var(--tp-estop); color: #fff; }
 .tp-strip .dm { min-width: 30cqw; }
 .tp-title .fbd { margin-left: auto; margin-right: 1ch; background: var(--tp-lamp-fault); color: #fff; padding: 0 .5ch; border-radius: .15em; font-weight: 700; font-size: .85em; }
+.tp-screen.alpha-popup .tp-body .row { opacity: 1; }

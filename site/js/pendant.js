@@ -271,7 +271,16 @@ const TPPendant = (() => {
           popEl.appendChild(col);
         });
         popEl.hidden = false;
-      } else popEl.hidden = true;
+        // The Alpha input box must not hide the field being typed: put it just under the cursor row, or above it when there is no room below.
+        const alpha = s.popup.columns && s.popup.columns[0] && s.popup.columns[0].title === 'Alpha input 1';
+        const rows = [...bodyEl.querySelectorAll('.row')], ci = rows.findIndex(r => r.querySelector('.cursor'));
+        popEl.style.top = '';
+        if (alpha && ci >= 0) {
+          const rh = rows[0].offsetHeight || 1, ph = popEl.offsetHeight, below = (ci + 1) * rh;
+          popEl.style.top = (below + ph <= bodyEl.clientHeight ? below + rh * 0.25 : Math.max(0, ci * rh - ph - rh * 0.25)) + 'px';
+        }
+        scr.classList.toggle('alpha-popup', !!alpha);
+      } else { popEl.hidden = true; scr.classList.remove('alpha-popup'); }
       scr.classList.toggle('has-popup', !!s.popup);
       promptEl.textContent = s.prompt || '';
       skCells.forEach((c, i) => { c.textContent = (s.softkeys && s.softkeys[i]) || ''; });
