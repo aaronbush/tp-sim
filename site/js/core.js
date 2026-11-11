@@ -584,6 +584,10 @@ function simulate(rootName, programs, st) {
   for (const k in st.uframes || {}) S.uframes[k] = st.uframes[k].slice();
   for (const k in st.tools || {}) S.tools[k] = st.tools[k].slice();
   if (!S.tools[1]) S.tools[1] = [0, 0, 100, 0, 0, 0];
+  // Optional live-controller start state (pendant trainer): active frames and output values
+  if (st.startUf != null) S.uf = +st.startUf;
+  if (st.startUt != null) S.ut = +st.startUt;
+  for (const k in st.outInit || {}) S.out[k] = st.outInit[k];
   const toolOf = n => { const v = S.tools[n] || [0, 0, 0, 0, 0, 0]; return { p: [v[0], v[1], v[2]], R: wprToR(v[3], v[4], v[5]) }; };
   const ufOf = n => frameOf(n === 0 ? [0, 0, 0, 0, 0, 0] : (S.uframes[n] || [0, 0, 0, 0, 0, 0]));
   let tExec = 0;
@@ -606,7 +610,7 @@ function simulate(rootName, programs, st) {
   };
   // current robot pose
   const q0 = (st.start || HOME).slice();
-  let cur = (() => { const f = fk(q0, toolOf(1)); return { p: f.tip, R: f.R, q: q0, label: 'start' }; })();
+  let cur = (() => { const f = fk(q0, toolOf(S.ut)); return { p: f.tip, R: f.R, q: q0, label: 'start' }; })();
   if (!root) return { error: `Program ${rootName} isn't loaded.` };
   let curProgName = root.name, curLine = 0;
 
@@ -726,7 +730,8 @@ function simulate(rootName, programs, st) {
     return { p: world.p, R: world.R, q, label, isPR: ref.kind === 'PR', taught: ref.kind === 'P' };
   }
 
-  stack = [{ prog: root.name, pc: 0, rootLine: null }];
+  // st.startLine (1-based) starts the root program part way through, as the pendant does from the cursor line
+  stack = [{ prog: root.name, pc: Math.max(0, Math.min(root.ins.length, (st.startLine || 1) - 1)), rootLine: null }];
   let stopReason = null, moveCount = 0;
   const rootLineNow = () => stack.length === 1 ? curLine : stack[0].callLine;
   const pushStep = (kind, extra) => steps.push({ prog: curProgName, line: curLine, kind, t: tExec, snap: snaps.length - 1, seg: segs.length, depth: stack.length, rootLine: rootLineNow(), ...extra });
@@ -897,7 +902,7 @@ function simulate(rootName, programs, st) {
         case 'motion': {
           const speed = { ...ins.speed };
           if (speed.reg) speed.val = readRef(speed.reg);
-          const term = { ...ins.term }; if (term.reg) term.val = Math.max(0, Math.min(100, readRef(term.reg)));
+          const term = st.forceFine ? { kind: 'FINE', val: 0 } : { ...ins.term }; if (!st.forceFine && term.reg) term.val = Math.max(0, Math.min(100, readRef(term.reg)));
           const tgt = poseFor(ins.tgt, prog.name, ins.num, ins);
           const via = ins.mt === 'C' ? poseFor(ins.via, prog.name, ins.num, null) : null;
           if (ins.opts.ignored.length) flag(prog.name, ins.num, 'info', 'Motion option not simulated', `"${ins.opts.ignored.join(' ')}" is ignored; the move is shown without it.`);
@@ -922,7 +927,10 @@ function simulate(rootName, programs, st) {
   if (stopReason === 'steps') flag(root.name, curLine, segs.some(s => s.mt !== 'W') ? 'info' : 'warn', 'Program loops forever', `The simulator stopped after ${LIMITS.steps.toLocaleString()} lines. ${segs.length ? 'This is normal for a program that loops until an input changes; ' : 'The loop never moves or waits, so the real controller would just spin here. '}the playback shows the first part.`, 'cap');
   if (stopReason === 'time') flag(root.name, curLine, 'info', 'Program keeps running', `The simulator stopped after ${st.maxTime || 120} s of program time. Programs that loop forever (like waiting for an input) are cut off here. Change "Simulate up to" in Settings for a longer run.`, 'cap');
   if (stopReason === 'moves') flag(root.name, curLine, 'info', 'Program keeps running', `The simulator stopped after ${LIMITS.moves} moves.`, 'cap');
-  return finishSim({ root, programs, byName, segs, steps, snaps, issues, ioEvents, pulses: pulseLog, st, stopReason, start: cur, uframesFinal: S.uframes, toolsFinal: S.tools });
+  // where execution would carry on (the next line to run), for a caller that resumes a capped or stopped run
+  const top = stack && stack.length ? stack[stack.length - 1] : null;
+  const resume = top ? { prog: top.prog, line: top.pc + 1, depth: stack.length } : null;
+  return finishSim({ root, programs, byName, segs, steps, snaps, issues, ioEvents, pulses: pulseLog, st, stopReason, resume, start: cur, uframesFinal: S.uframes, toolsFinal: S.tools });
 }
 
 // Blending, timeline, motion findings
@@ -1049,4 +1057,5 @@ function runSim(rootName, programs, st) {
   return res;
 }
 
-if (typeof module !== 'undefined') module.exports = { parseLS, splitLS, makeProgram, parsePositions, toLS, formatPosition, runSim, macroKey, simulate, fk, ik, wprToR, rToWpr, frameOf, toWorld, toFrame, poseToV6, collectRefs, parseLine, parseExpr, refShort, HOME, ROBOT, quatToR, lerp3, lerpN };
+if (typeof module !== 'undefined') module.exports = { parseLS, splitLS, makeProgram, parsePositions, toLS, formatPosition, runSim, macroKey, simulate, fk, ik, wprToR, rToWpr, frameOf, toWorld, toFrame, poseToV6, collectRefs, parseLine, parseExpr, refShort, HOME, ROBOT, quatToR, lerp3, lerpN,
+  add, sub, scl, matMul, matT, matVec, col, I3, D2R, defaultHeader, refText };

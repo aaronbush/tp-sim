@@ -116,6 +116,21 @@ const lines = (sim) => sim.steps.map(s => `${s.prog}:${s.line}`);
   const s6 = run('T', [mk('T', ['DO[1]=PULSE,1.0sec', 'WAIT 2.00(sec)', 'R[1]=DO[1]'])]);
   check('pulse is off after the wait', s6.snaps[s6.snaps.length - 1].R[1] === 0 && s6.snaps.some(x => x.out['DO[1]'] === 1)); }
 
+// live-controller start options: start line, start frames, outputs, STEP-test FINE, resume point
+{ const mk = (ls, pos = '') => c.makeProgram('T', '', ls, pos);
+  const s = run('T', [mk(['R[1]=1', 'R[2]=2', 'R[3]=R[1]+R[2]'])], { startLine: 2, r: { 1: 10 } });
+  check('startLine skips the earlier lines', lines(s).join() === 'T:2,T:3' && s.snaps[s.snaps.length - 1].R[3] === 12);
+  const s2 = run('T', [mk(['R[1]=UFRAME_NUM', 'R[2]=DO[4]'])], { startUf: 2, startUt: 3, outInit: { 'DO[4]': 1 } });
+  check('startUf / startUt / outInit seed the machine state', s2.snaps[0].uf === 2 && s2.snaps[0].ut === 3 && s2.snaps[s2.snaps.length - 1].R[2] === 1);
+  const box = load('box_ab.ls');
+  const cont = run('BOX_AB', [box]), stepT = run('BOX_AB', [box], { forceFine: true });
+  check('forceFine runs every termination as FINE (no blends)', cont.segs.some(g => g.blendR) && !stepT.segs.some(g => g.blendR) && stepT.segs.every(g => g.mt === 'W' || g.term.kind === 'FINE'));
+  const s3 = run('T', [mk(['R[1]=1', 'WAIT DI[1]=ON', 'R[2]=1'])]);
+  check('a run stuck on a WAIT reports where it would resume', s3.stopReason === 'wait' && s3.resume && s3.resume.line === 2);
+  check('a finished run has no resume point', s.resume === null);
+  const q = [10, 20, -10, 0, -80, 0], s4 = run('T', [mk(['R[1]=1'])], { start: q, startUt: 1 });
+  check('start joints are the start pose', s4.T.q[0].every((v, i) => Math.abs(v - q[i]) < 1e-9)); }
+
 // .ls round trip
 { const p = load('main_select.ls'); const p2 = c.parseLS(c.toLS(p));
   check('.ls round trip keeps lines', JSON.stringify(p.lines) === JSON.stringify(p2.lines)); }

@@ -1,0 +1,49 @@
+{
+  "name": "tp-sim",
+  "displayName": "TP Sim — teach pendant trainer",
+  "description": "Edit and simulate teach-pendant .ls programs in a VS Code webview.",
+  "version": "0.1.0",
+  "publisher": "tp-sim",
+  "license": "MIT",
+  "private": true,
+  "engines": { "vscode": "^1.82.0" },
+  "categories": ["Education", "Programming Languages", "Other"],
+  "main": "./extension.js",
+  "browser": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "tpSim.open", "title": "Open simulator", "category": "TP Sim" },
+      { "command": "tpSim.openFile", "title": "Open this .ls file in the simulator", "category": "TP Sim" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "tpSim.openFile", "when": "resourceExtname =~ /[.]ls$/i" }
+      ],
+      "editor/title": [
+        { "command": "tpSim.openFile", "when": "resourceExtname =~ /[.]ls$/i", "group": "navigation" }
+      ],
+      "editor/context": [
+        { "command": "tpSim.openFile", "when": "resourceExtname =~ /[.]ls$/i", "group": "navigation" }
+      ],
+      "explorer/context": [
+        { "command": "tpSim.openFile", "when": "resourceExtname =~ /[.]ls$/i", "group": "navigation" }
+      ]
+    },
+    "languages": [
+      {
+        "id": "tp-ls",
+        "aliases": ["TP program", "tp-ls"],
+        "extensions": [".ls", ".LS"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      { "language": "tp-ls", "scopeName": "source.tp-ls", "path": "./syntaxes/tp-ls.tmLanguage.json" }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "node scripts/copy-site.js",
+    "test": "node test/rewrite.test.js"
+  }
+}
