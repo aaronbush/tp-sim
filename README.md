@@ -72,7 +72,7 @@ It works with the `.ls` export format used by FANUC controllers. This project is
   - mixing `+` with `*`, or `AND` with `OR`, on one line
   - unmatched `IF/ENDIF` and `FOR/ENDFOR`
 
-Your programs never leave your browser. They are saved in the browser's local storage so edits survive a reload.
+Your programs never leave your browser. They are saved in the browser's local storage so edits survive a reload. Opening an `.ls` file copies it in, so later changes to the file on disk don't show until you open it again, and edits in the page reach the file only through **Download .ls**. **Reset** (header) erases everything saved for the page in this browser (programs, registers, frames, inputs, macros, settings) and reloads the examples; click it twice to confirm.
 
 ## Examples
 

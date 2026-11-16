@@ -8,7 +8,9 @@ const fmtV = v => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : 
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem('ppv.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem('ppv.' + k, JSON.stringify(v)); } catch (e) {} }
+  set(k, v) { if (store.wiped) return; try { localStorage.setItem('ppv.' + k, JSON.stringify(v)); } catch (e) {} },
+  // Reset: remove every saved key; later saves (pending timers) are ignored until the page reloads
+  wipe() { store.wiped = true; try { Object.keys(localStorage).filter(k => k.startsWith('ppv.')).forEach(k => localStorage.removeItem(k)); } catch (e) {} }
 };
 
 // ---------- settings ----------
@@ -68,6 +70,23 @@ function newEntry() {
   return { name: 'NEW' + n, header: '', lines, posText: '', origLines: null, origPos: null };
 }
 $('newBtn').addEventListener('click', () => addEntry(newEntry(), true));
+// Reset: click twice (no confirm() dialogs). Erases programs, registers, frames, inputs, macros and settings, then reloads with the examples.
+{ const b = $('resetBtn'); let armT = 0;
+  const note = $('resetNote');
+  const disarm = () => { clearTimeout(armT); armT = 0; b.classList.remove('armed'); b.textContent = 'Reset'; note.hidden = true; };
+  b.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!armT) {
+      const edited = programs.filter(isEdited).map(p => p.name);
+      b.classList.add('armed'); b.textContent = 'Click again to erase';
+      note.textContent = `Reset erases every program, register, frame and setting saved in this browser and reloads the examples.${edited.length ? ` Edits you haven't downloaded will be lost: ${edited.join(', ')}.` : ''} Click Reset again within 5 s to confirm.`;
+      note.hidden = false;
+      armT = setTimeout(disarm, 5000); return;
+    }
+    disarm(); store.wipe(); location.reload();
+  });
+  document.addEventListener('click', () => { if (armT) disarm(); });
+  b.addEventListener('blur', () => { if (armT) setTimeout(() => { if (document.activeElement !== b && armT) disarm(); }, 0); }); }
 $('fileIn').addEventListener('change', async e => {
   const files = [...e.target.files];
   for (let i = 0; i < files.length; i++) {

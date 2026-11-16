@@ -83,7 +83,7 @@ The whole pipeline re-runs on every edit (debounced 350 ms in `app.js` `schedule
 
 ## app.js
 
-- **Workspace.** `programs[]` entries are `{name, header, lines[], posText, origLines, origPos, _prog}`. `_prog` is the parsed cache, cleared on edit. The workspace is saved to `localStorage['ppv.ws']`; settings are saved to `localStorage['ppv.settings2']`, migrated from the v1 keys `ppv.tool`/`ppv.pr`.
+- **Workspace.** `programs[]` entries are `{name, header, lines[], posText, origLines, origPos, _prog}`. `_prog` is the parsed cache, cleared on edit. The workspace is saved to `localStorage['ppv.ws']`; settings are saved to `localStorage['ppv.settings2']`, migrated from the v1 keys `ppv.tool`/`ppv.pr`. `store.wipe()` (the header **Reset** button, click twice) removes every `ppv.` key and sets `store.wiped` so pending save timers can't write the old state back before the reload.
 - **Settings shape.**
 
   ```js
