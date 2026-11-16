@@ -173,4 +173,4 @@ Ordered by value to a student working through the course labs:
 | STATUS menu (Version ID, system status) | not in manual | Not available | n/a | |
 | Initial setup (axis limits, payload, mastering) | p107-p118 | Not available | Not available | |
 | System variables screen | not in manual | Not available | Not available | |
-| Saved workspace and settings | not in manual | n/a | Done | Stored in the browser only |
+| Saved workspace and settings | not in manual | n/a | Done | Stored in the browser only; Reset (click twice) erases it and reloads the examples |

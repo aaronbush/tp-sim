@@ -359,3 +359,8 @@ body.pendant-mode #paperPanel { display: none; }
 }
 @media (max-width: 699px) { .fold { display: none; } }
 @media (prefers-reduced-motion: reduce) { .fold svg { transition: none; } }
+
+/* Reset: second click confirms */
+.resetbtn.armed { background: var(--bad); border-color: var(--bad); color: #fff; }
+.resetnote { flex: 1 0 100%; order: 10; margin: 0; padding: 8px 12px; border: 1px solid var(--bad); border-radius: 4px; background: color-mix(in srgb, var(--bad) 10%, var(--panel)); color: var(--fg); font-size: 13px; }
+@media (max-width: 699px) { #resetBtn { flex: none; } }
