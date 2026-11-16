@@ -250,7 +250,7 @@ function renderIssues() {
   const c = { bad: 0, warn: 0, info: 0 }; sim.issues.forEach(i => c[i.sev]++);
   $('issueCount').textContent = sim.issues.length ? `${c.bad} problems · ${c.warn} warnings · ${c.info} notes` : 'none';
   const moves = sim.segs.filter(s => s.mt !== 'W').length;
-  const ended = { end: 'ran to the end', abort: 'aborted', error: 'stopped on an error', wait: 'stuck waiting', steps: 'cut off (endless loop)', time: 'cut off (time limit)', moves: 'cut off (move limit)' }[sim.stopReason] || sim.stopReason;
+  const ended = { end: 'ran to the end', abort: 'aborted', error: 'stopped on an error', alarm: 'paused on a user alarm', wait: 'stuck waiting', steps: 'cut off (endless loop)', time: 'cut off (time limit)', moves: 'cut off (move limit)' }[sim.stopReason] || sim.stopReason;
   $('summary').innerHTML = `<span class="chip">cycle ≈ <b>${sim.total.toFixed(1)} s</b></span><span class="chip">moves <b>${moves}</b></span><span class="chip">lines run <b>${sim.steps.length}</b></span><span class="chip">ink <b>${sim.inkLen.toFixed(0)} mm</b></span><span class="chip"><b>${ended}</b></span>`;
   $('issues').innerHTML = sim.issues.length ? sim.issues.map((i, k) => `<li data-k="${k}" tabindex="0"><span class="stripe ${i.sev}"></span><span class="lno">${i.prog !== sim.activeName ? esc(i.prog) + ' ' : ''}L${i.line}</span><div><div class="t">${esc(i.title)}</div><div class="d">${esc(i.detail)}</div></div></li>`).join('')
     : '<li class="empty" style="display:block;cursor:default">No problems found.</li>';

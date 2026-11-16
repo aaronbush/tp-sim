@@ -92,8 +92,9 @@ This is a study aid, not a certified simulator.
 - **Arm model:** a generic small 6-axis arm (330 mm upper arm, 335 mm forearm), front / elbow-up configuration only.
 - **Approximate timing:** CNT blending, acceleration and logic timing are approximations, so corner shapes and cycle times are estimates.
 - **Values the `.ls` file doesn't hold:** registers, PRs, frames and inputs live on the controller. Enter them on the page (registers and PRs in the Data screens).
-- **Not simulated:** system variables, `TIMER`, `PAYLOAD`, `MESSAGE`, `SKIP`, `INC`, string registers (`SR[ ]`), background logic and multiple motion groups. These are skipped and noted in Findings where it matters.
-- **WAIT timeouts:** a `WAIT … TIMEOUT,LBL[ ]` times out after the Settings value (30 s to start), standing in for the controller's setting.
+- **Miscellaneous instructions:** `TIMER[ ]=RESET/START/STOP` counts simulated program time (reading `TIMER[ ]` gives seconds), `PAYLOAD[ ]` is tracked but doesn't change the motion, `UALM[ ]` stops the run as a paused user alarm (on the pendant, RESET and SHIFT+FWD carry on with the next line), and `$WAITTMOUT=` sets the WAIT timeout (read in 10 ms units, so 100 = 1 s; check your controller). Other `$` system variables are remembered but do nothing. A flag (`F[ ]`) the programs read but never set, such as a dry-run switch, is listed under Inputs so you can turn it on.
+- **Not simulated:** `MESSAGE`, `SKIP`, `INC`, string registers (`SR[ ]`), background logic and multiple motion groups. These are skipped and noted in Findings where it matters.
+- **WAIT timeouts:** a `WAIT … TIMEOUT,LBL[ ]` times out after the Settings value (30 s to start), standing in for the controller's setting, unless the program sets `$WAITTMOUT`.
 - **Exported `.ls` files are not yet verified on a controller.** Loading an `.ls` file on a controller needs the ASCII program loader option.
 
 ## Running locally

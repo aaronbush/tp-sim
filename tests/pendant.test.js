@@ -463,6 +463,15 @@ function progHost(h, name, lines, posText) { h.host.store[name] = { name, header
   h.press('FCTN', 'D1', 'RESET'); h.down('SHIFT'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
   check('11 after ABORT (ALL) the new program runs', h.host.settings.r[2] === 2); }
 
+// UALM: alarm and pause; after RESET, SHIFT+FWD carries on with the next line
+{ const h = rig().ready();
+  progHost(h, 'UA', ['R[1]=1', 'UALM[2]', 'R[2]=2']);
+  h.c.selectProgram('UA'); h.press('EDIT');
+  h.down('SHIFT'); h.press('FWD'); h.tickUntil(() => h.st().runState !== 'RUNNING');
+  check('11 UALM raises a user alarm and pauses', h.st().runState === 'PAUSED' && /UALM\[2\]/.test(h.st().alarm) && h.host.settings.r[2] === undefined, h.st().alarm + ' ' + h.st().runState);
+  h.up('SHIFT'); h.press('RESET'); h.down('SHIFT'); h.press('FWD'); h.tickUntil(() => h.st().runState === 'ABORTED'); h.up('SHIFT');
+  check('11 resuming after UALM runs the next line', h.host.settings.r[2] === 2); }
+
 // WAIT on an input: the run sits on the line until the input is simulated on
 { const h = rig().ready();
   progHost(h, 'WT', ['WAIT DI[3]=ON', 'R[5]=1']);

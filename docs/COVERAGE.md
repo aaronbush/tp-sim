@@ -8,7 +8,7 @@ What the trainer covers and what it doesn't, one row per feature, so every gap i
 
 Ordered by value to a student working through the course labs:
 
-1. **Miscellaneous instructions**: `SKIP`/`SKIP CONDITION`, `TIMER[ ]`, `MESSAGE`, `PAYLOAD`, `INC` (chapter 17 labs). Neither side simulates them.
+1. **Miscellaneous instructions**: `SKIP`/`SKIP CONDITION`, `MESSAGE`, `INC` (chapter 17 labs) aren't simulated; `TIMER[ ]`, `UALM[ ]`, `PAYLOAD[ ]` and `$WAITTMOUT` run in the simulator but can't be inserted from the pendant's [INST] menu.
 2. **`FOR`/`ENDFOR`, `IF (...)` with AND/OR and `CALL program()` on the pendant** (chapter 15). The simulator already runs `FOR`; the pendant can't insert it.
 3. **Group, analog and UOP I/O screens** (chapter 14), with GI/GO bit mapping to DI/DO.
 4. **Auto-mode macros** (DI/RI/UI/SOP triggers, chapter 16): the table accepts the assignment but nothing fires it.
@@ -95,9 +95,11 @@ Ordered by value to a student working through the course labs:
 | Macro lines (`OPEN HAND`, `GRIP_CLOSE(2)`) | p298 | Done | Done | Needs the macro table; falls back to a same-named program with a note |
 | `INC` (incremental motion) | not in manual | Not available | Not available | Skipped |
 | `SKIP CONDITION`, `Skip,LBL` | p313 | Not available | Not available | Skipped |
-| `TIMER[ ]` | p313 | Not available | Not available | Skipped |
-| System variables (`$...`) | not in manual | Not available | Not available | |
-| `MESSAGE`, `PAYLOAD`, `UALM`, `RSR` | p313 | Not available | Not available | |
+| `TIMER[ ]` (RESET, START, STOP, read into `R[ ]`) | p313 | Not available | Done | Counts simulated (approximate) program time; reads in seconds |
+| System variables (`$...`) | not in manual | Not available | Partial | `$WAITTMOUT=` sets the WAIT timeout (10 ms units, unverified); others are stored and read back but do nothing |
+| `UALM[ ]` | p313 | Not available (insert) | Done | Stops the editor run; the pendant raises INTP-213 (code unverified) and pauses, RESET + SHIFT+FWD carries on. Alarm message text not set up |
+| `PAYLOAD[ ]` | p313 | Not available | Partial | Tracked in the state; no effect on motion |
+| `MESSAGE`, `RSR` | p313 | Not available | Not available | |
 | String registers `SR[ ]`; text arguments | not in manual | Not available | Partial | Text arguments only for `=` / `<>` checks |
 | Group I/O bit mapping (GI/GO to DI/DO) | p243-p262 | Not available | Not available | GI/GO are plain numbers |
 | Indirect positions `P[R[n]]`, `PR[R[n]]` | p205-p224 | Not available | Partial | Run works; paper view labels are poor |

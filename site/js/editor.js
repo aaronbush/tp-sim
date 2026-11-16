@@ -7,7 +7,7 @@ const TPEditor = (() => {
 
   // ---- language: one TP instruction per line ----
   const T = { motJ: Tag.define(), motL: Tag.define(), motC: Tag.define(), pos: Tag.define(), io: Tag.define(), term: Tag.define(), opt: Tag.define() };
-  const KW = /^(IF|THEN|ELSE|ENDIF|SELECT|FOR|TO|DOWNTO|ENDFOR|JMP|CALL|WAIT|TIMEOUT|END|ABORT|PAUSE|AND|OR|NOT|DIV|MOD|OVERRIDE|PULSE|LPOS|JPOS|UFRAME_NUM|UTOOL_NUM|UFRAME|UTOOL|OFFSET|TOOL_OFFSET|CONDITION|PAYLOAD)\b/i;
+  const KW = /^(IF|THEN|ELSE|ENDIF|SELECT|FOR|TO|DOWNTO|ENDFOR|JMP|CALL|WAIT|TIMEOUT|END|ABORT|PAUSE|AND|OR|NOT|DIV|MOD|OVERRIDE|PULSE|LPOS|JPOS|UFRAME_NUM|UTOOL_NUM|UFRAME|UTOOL|OFFSET|TOOL_OFFSET|CONDITION|PAYLOAD|UALM|RESET|START|STOP)\b/i;
   const BR = '\\[[^\\]\\[]*(?:\\[[^\\]]*\\][^\\]\\[]*)?\\]';
   const reIO = new RegExp('^(DI|DO|RI|RO|GI|GO|UI|UO|SI|SO|AI|AO|F|M)' + BR, 'i');
   const reReg = new RegExp('^(R|AR|SR|TIMER)' + BR, 'i');
