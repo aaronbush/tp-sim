@@ -27,7 +27,7 @@ In the app as Pendant mode. Known limits:
 
 - **Exported `.ls` on a real controller.** `toLS()` follows the format of the owner's exported files, but nobody has loaded a downloaded file on a controller yet. Watch especially for line spacing, `C` continuation lines, options on one line versus a `:` continuation, the header fields `PROG_SIZE`/`MEMORY_SIZE`, and the CONFIG string. Loading also needs the controller's ASCII program loader option.
 - **iPad / touch.** CodeMirror editing, drag in teach mode, jog button repeat, and the file picker haven't been tested on an iPad. The owner uses Firefox and Chrome on an iPad.
-- **Default WAIT timeout.** `WAIT … TIMEOUT,LBL[ ]` starts at 30 s (changeable in Settings). Confirm the controller's default.
+- **Default WAIT timeout.** `WAIT … TIMEOUT,LBL[ ]` starts at 30 s (changeable in Settings). Confirm the controller's default, and the units of `$WAITTMOUT` (the simulator assumes 10 ms, so 3000 = 30 s). Also unverified: the `INTP-213` code and text the pendant shows for `UALM[ ]`.
 - **Macro and argument details.** Not checked against a controller: how macro names with spaces appear in exported `.ls` files, the quote style for text arguments, and whether `IF …,` can take a macro as its action (not supported here).
 
 ## Simulation gaps (each is skipped or approximated today)
@@ -38,9 +38,7 @@ In the app as Pendant mode. Known limits:
 - **Instructions not simulated:**
   - `INC` (incremental motion)
   - `Skip,LBL` / `SKIP CONDITION`
-  - `TIMER[ ]`
-  - system variables (`$...`)
-  - `MESSAGE`, `PAYLOAD`, `UALM`, `RSR`
+  - `MESSAGE`, `RSR`; `PAYLOAD` is tracked but has no effect on motion; `$` system variables other than `$WAITTMOUT` are stored only
   - string registers (`SR[ ]`); text arguments work only for `=` / `<>` checks
   - macros fired by DI/RI/UI/SOP inputs (macro lines in programs run; the pendant runs MF and user-key macros by hand)
   - background logic

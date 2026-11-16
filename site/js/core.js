@@ -389,7 +389,11 @@ function classify(ins, t) {
   if ((m = t.match(/^OVERRIDE\s*=\s*(\d+)\s*%$/i))) { ins.type = 'override'; ins.val = +m[1]; return; }
   if ((m = t.match(/^(UFRAME_NUM|UTOOL_NUM)\s*=\s*(.+)$/i))) { ins.type = m[1].toUpperCase() === 'UFRAME_NUM' ? 'ufnum' : 'utnum'; ins.expr = parseExpr(m[2]); return; }
   if ((m = t.match(/^(UFRAME|UTOOL)\[(\d+)(?::[^\]]*)?\]\s*=\s*(.+)$/i))) { ins.type = m[1].toUpperCase() === 'UFRAME' ? 'setuf' : 'setut'; ins.idx = +m[2]; ins.expr = parseExpr(m[3]); return; }
-  if (/^(PAYLOAD|MESSAGE|TIMER|UALM|RSR|JOINT_MAX_SPEED|LINEAR_MAX_SPEED|SKIP\s+CONDITION|\$)/i.test(t)) { ins.type = 'ignored'; return; }
+  if ((m = t.match(/^TIMER\[(\d+)(?::[^\]]*)?\]\s*=\s*(RESET|START|STOP)$/i))) { ins.type = 'timer'; ins.idx = +m[1]; ins.op = m[2].toUpperCase(); return; }
+  if ((m = t.match(/^PAYLOAD\[(\d+)(?::[^\]]*)?\]$/i))) { ins.type = 'payload'; ins.idx = +m[1]; return; }
+  if ((m = t.match(/^UALM\[(\d+)(?::[^\]]*)?\]$/i))) { ins.type = 'ualm'; ins.idx = +m[1]; return; }
+  if ((m = t.match(/^(\$[A-Za-z_][\w$.]*)\s*=\s*(.+)$/))) { ins.type = 'sysvar'; ins.name = m[1].toUpperCase(); ins.expr = parseExpr(m[2]); return; }
+  if (/^(MESSAGE|RSR|JOINT_MAX_SPEED|LINEAR_MAX_SPEED|SKIP\s+CONDITION)/i.test(t)) { ins.type = 'ignored'; return; }
   const eq = splitTop(t, '=');
   if (eq) {
     const lhs = parseExpr(eq[0]);
@@ -468,6 +472,7 @@ function analyzeStructure(prog) {
 // Registers, positions and I/O a program refers to (for the settings panels)
 function collectRefs(progs) {
   const out = { R: new Set(), PR: new Set(), inputs: new Set(), outputs: new Set(), UF: new Set([0]), UT: new Set([1]), macros: new Set() };
+  const fSet = new Set();
   const visit = (node) => {
     if (!node || typeof node !== 'object') return;
     if (node.ref) addRef(node.ref);
@@ -496,8 +501,11 @@ function collectRefs(progs) {
       if (ins.type === 'utnum' && ins.expr.ast.num != null) out.UT.add(ins.expr.ast.num);
       if (ins.type === 'setuf') out.UF.add(ins.idx);
       if (ins.type === 'setut') out.UT.add(ins.idx);
+      if (ins.type === 'assign' && ins.lhs.kind === 'F' && typeof ins.lhs.idx === 'number') fSet.add(`F[${ins.lhs.idx}]`);
     }
   }
+  // A flag the programs read but never set (e.g. a dry-run switch) is set by the operator, so list it with the inputs
+  for (const k of [...out.outputs]) if (k.startsWith('F[') && !fSet.has(k)) { out.outputs.delete(k); out.inputs.add(k); }
   return out;
 }
 
@@ -577,7 +585,7 @@ function simulate(rootName, programs, st) {
   // machine state
   const S = {
     R: {}, PR: {}, out: {}, uf: 0, ut: 1, override: 100, offCond: null, toolOffCond: null,
-    uframes: {}, tools: {}, rSet: new Set()
+    uframes: {}, tools: {}, rSet: new Set(), timers: {}, payload: null, sys: {}
   };
   for (const k in st.r || {}) S.R[k] = +st.r[k] || 0;
   for (const k in st.pr || {}) if (st.pr[k]) S.PR[k] = { type: st.pr[k].type, v: st.pr[k].v.slice() };
@@ -593,9 +601,9 @@ function simulate(rootName, programs, st) {
   let tExec = 0;
   // Pulsed outputs still on: {key, until}; pulseLog keeps every pulse for the playback panel
   const pulses = [], pulseLog = [];
-  const waitTimeout = +st.waitTimeout > 0 ? +st.waitTimeout : WAIT_TIMEOUT_DEFAULT;
+  let waitTimeout = +st.waitTimeout > 0 ? +st.waitTimeout : WAIT_TIMEOUT_DEFAULT, waitTimeoutBy = null;   // waitTimeoutBy: where the program set $WAITTMOUT
   let stack = null;
-  const snapshot = () => { const top = stack && stack[stack.length - 1]; snaps.push({ R: { ...S.R }, PR: JSON.parse(JSON.stringify(S.PR)), out: { ...S.out }, uf: S.uf, ut: S.ut, override: S.override, ar: top && top.args ? top.args.slice() : null }); };
+  const snapshot = () => { const top = stack && stack[stack.length - 1]; snaps.push({ R: { ...S.R }, PR: JSON.parse(JSON.stringify(S.PR)), out: { ...S.out }, uf: S.uf, ut: S.ut, override: S.override, payload: S.payload, ar: top && top.args ? top.args.slice() : null }); };
   snapshot();
   const inputVal = (key, t) => {
     const d = (st.inputs || {})[key]; if (!d) return 0;
@@ -627,6 +635,7 @@ function simulate(rootName, programs, st) {
       case 'R': if (!(n in S.R)) { warnUninitR(n); S.R[n] = 0; } return S.R[n];
       case 'PR': { const pr = prGet(n); if (r.elem != null) return pr.v[r.elem - 1] ?? 0; return { pr: { type: pr.type, v: pr.v.slice() } }; }
       case 'P': { const P = (byName[curProgName].pos || {})[n]; if (!P) throw new TPError(`P[${n}] has no position data`); return { pr: P.cart ? { type: 'cart', v: P.cart.slice() } : { type: 'joint', v: P.joints.slice() } }; }
+      case 'TIMER': { const tm = S.timers[n]; return tm ? Math.round((tm.acc + (tm.t0 != null ? tExec - tm.t0 : 0)) * 1000) / 1000 : 0; }
       case 'AR': {
         const args = stack[stack.length - 1].args || [];
         if (n < 1 || n > args.length) throw new TPError(`AR[${n}] wasn't passed in: ${args.length ? `the CALL only gives ${args.length} argument${args.length > 1 ? 's' : ''}` : 'this program was started or called without arguments'}. The controller stops with an alarm here. Add it to the CALL, like CALL ${curProgName}(${Array.from({ length: Math.max(n, 1) }, (_, i) => i + 1).join(',')}).`);
@@ -635,6 +644,7 @@ function simulate(rootName, programs, st) {
       default: {
         const key = `${r.kind}[${n}]`;
         if (INPUT_KINDS.has(r.kind)) return inputVal(key, tExec);
+        if (r.kind === 'F' && !(key in S.out)) return inputVal(key, tExec);   // a flag the program hasn't set yet: the operator's value from Inputs
         const p = pulses.find(x => x.key === key); if (p && tExec >= p.until - 1e-9) return 0;
         return S.out[key] ?? 0;
       }
@@ -655,7 +665,7 @@ function simulate(rootName, programs, st) {
       if (n.pos === 'JPOS') return { pr: { type: 'joint', v: cur.q.slice() } };
       const loc = toFrame(ufOf(S.uf), cur.p, cur.R); return { pr: { type: 'cart', v: poseToV6(loc.p, loc.R) } };
     }
-    if (n.sysvar) return 0;
+    if (n.sysvar) { const k = n.sysvar.toUpperCase(); return k in S.sys ? S.sys[k] : k === '$WAITTMOUT' ? Math.round(waitTimeout * 100) : 0; }
     const a = n.a ? evalNode(n.a) : null;
     if (n.op === 'NEG') return a && a.pr ? { pr: { type: a.pr.type, v: a.pr.v.map(x => -x) } } : -a;
     if (n.op === 'NOT') return a ? 0 : 1;
@@ -793,6 +803,30 @@ function simulate(rootName, programs, st) {
           flag(prog.name, ins.num, 'info', 'PAUSE', 'The real program would pause here until restarted. The simulator carries on.'); pushStep('logic'); frame.pc++; break;
         case 'abort':
           pushStep('logic'); stopReason = 'abort'; break;
+        case 'timer': {
+          // program timers count (approximate) program time; reading one gives seconds
+          const tm = S.timers[ins.idx] || (S.timers[ins.idx] = { acc: 0, t0: null });
+          if (ins.op === 'RESET') { tm.acc = 0; if (tm.t0 != null) tm.t0 = tExec; }
+          else if (ins.op === 'START') { if (tm.t0 == null) tm.t0 = tExec; }
+          else if (tm.t0 != null) { tm.acc += tExec - tm.t0; tm.t0 = null; }
+          pushStep('logic'); frame.pc++; break;
+        }
+        case 'payload':
+          S.payload = ins.idx; changed(); pushStep('logic'); frame.pc++; break;
+        case 'ualm':
+          // A user alarm shows its message and pauses the program; after RESET, a restart carries on with the next line
+          flag(prog.name, ins.num, 'bad', `User alarm UALM[${ins.idx}]`, `The program raises user alarm ${ins.idx} here. The controller shows its message (set under MENU › SETUP › User Alarm) and pauses; after RESET, starting again carries on with the next line. The simulator stops here.`, 'ualm' + prog.name + ins.num);
+          pushStep('logic', { ualm: ins.idx }); frame.pc++; stopReason = 'alarm'; break;
+        case 'sysvar': {
+          const v = evalE(ins.expr); if (typeof v !== 'number') throw new TPError('A system variable here takes a number');
+          S.sys[ins.name] = v;
+          if (ins.name === '$WAITTMOUT') {
+            // unverified: read as 10 ms units, so the usual default of 3000 is 30 s
+            waitTimeout = Math.max(0, v) / 100; waitTimeoutBy = { prog: prog.name, line: ins.num };
+            flag(prog.name, ins.num, 'info', `WAIT timeout set to ${+waitTimeout.toFixed(2)} s`, `$WAITTMOUT=${v} sets how long a WAIT ... TIMEOUT,LBL[ ] waits before it jumps. The simulator reads it in 10 ms units (3000 = 30 s, the usual default), so ${v} is ${+waitTimeout.toFixed(2)} s. Check the units for your controller's software version before relying on it.`, 'waittmout' + v);
+          } else flag(prog.name, ins.num, 'info', `${ins.name} isn't simulated`, `The simulator remembers ${ins.name}=${v} so the program can read it back, but it doesn't change how anything runs.`, 'sys' + ins.name);
+          pushStep('logic'); frame.pc++; break;
+        }
         case 'end':
           pushStep('logic'); popFrame(); if (!stack.length) stopReason = 'end'; break;
         case 'jmp':
@@ -862,7 +896,7 @@ function simulate(rootName, programs, st) {
             tt = nx; tExec = tt; ok = !!evalE(ins.cond); tExec = t0;
           }
           if (ok) { const d = tt - t0; pushStep('wait', { dur: d, cond: true }); if (d > 0) addDwell(d, 'cond'); frame.pc++; }
-          else if (ins.timeoutLbl) { pushStep('wait', { dur: limit, cond: false }); addDwell(limit, 'timeout'); flag(prog.name, ins.num, 'info', 'WAIT timed out', `The condition never came true, so after the ${waitTimeout} s timeout the program jumps to LBL[${idxOf(ins.timeoutLbl)}]. The real timeout is a controller setting; change the simulator's under Settings › WAIT timeout.`); jumpTo(frame, prog, ins.timeoutLbl); }
+          else if (ins.timeoutLbl) { pushStep('wait', { dur: limit, cond: false }); addDwell(limit, 'timeout'); flag(prog.name, ins.num, 'info', 'WAIT timed out', `The condition never came true, so after the ${+waitTimeout.toFixed(2)} s timeout the program jumps to LBL[${idxOf(ins.timeoutLbl)}]. ${waitTimeoutBy ? `The time comes from $WAITTMOUT (${waitTimeoutBy.prog} line ${waitTimeoutBy.line}).` : 'The real timeout is a controller setting ($WAITTMOUT); change the simulator’s under Settings › WAIT timeout.'}`); jumpTo(frame, prog, ins.timeoutLbl); }
           else { pushStep('wait', { dur: 2, cond: false }); addDwell(2, 'forever'); flag(prog.name, ins.num, 'bad', 'Waits forever', `"${ins.text}" never becomes true with the inputs as set, so the robot would sit here forever. Change the input under Inputs, or set it to switch on after a few seconds.`); stopReason = 'wait'; }
           break;
         }

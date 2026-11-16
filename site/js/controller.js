@@ -824,6 +824,12 @@ const TPController = (() => {
           this.raise(`(${sp.prog}, ${sp.line}) ${is ? (is.detail || is.title) : 'Program stopped'}`, 'stop');   // unverified: no INTP code
           return;
         }
+        if (last && r.sim.stopReason === 'alarm') {   // UALM[ ]: alarm and pause; starting again carries on from the next line (sim.resume)
+          this.applyStep(sp);
+          r.cur = -1; r.next = steps.length; r.dirty = true;
+          this.raise(`INTP-213 (${sp.prog}, ${sp.line}) UALM[${sp.ualm}] User alarm`, 'stop');   // unverified: alarm code; the real text is the SETUP › User Alarm message
+          return;
+        }
         if (sp.kind === 'move' && this.segUnreachable(sp)) { this.applyStep(sp); this.raise(ALARM.REACH, 'stop'); return; }
         r.cur = r.next++; this.applyStep(sp);
         if (r.t < sp.t) r.t = sp.t;

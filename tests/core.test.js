@@ -131,6 +131,33 @@ const lines = (sim) => sim.steps.map(s => `${s.prog}:${s.line}`);
   const q = [10, 20, -10, 0, -80, 0], s4 = run('T', [mk(['R[1]=1'])], { start: q, startUt: 1 });
   check('start joints are the start pose', s4.T.q[0].every((v, i) => Math.abs(v - q[i]) < 1e-9)); }
 
+// miscellaneous instructions: TIMER, PAYLOAD, UALM, $WAITTMOUT, operator-set flags
+{ const mk = (ls, name = 'T') => c.makeProgram(name, '', ls, '');
+  const types = ['TIMER[1]=RESET', 'TIMER[2:CYCLE]=START', 'PAYLOAD[2]', 'UALM[3]', '$WAITTMOUT=100'].map(t => c.parseLine(t, 1).type);
+  check('TIMER, PAYLOAD, UALM and $ lines parse', types.join() === 'timer,timer,payload,ualm,sysvar', types.join());
+  const s = run('T', [mk(['TIMER[1]=RESET', 'TIMER[1]=START', 'WAIT 1.50(sec)', 'TIMER[1]=STOP', 'WAIT 1.00(sec)', 'R[1]=TIMER[1]', 'TIMER[1]=START', 'WAIT .50(sec)', 'R[2]=TIMER[1]', 'TIMER[1]=RESET', 'R[3]=TIMER[1]'])]);
+  const R = s.snaps[s.snaps.length - 1].R;
+  check('TIMER counts only while started', Math.abs(R[1] - 1.5) < 1e-6 && Math.abs(R[2] - 2) < 1e-6, `${R[1]} ${R[2]}`);
+  check('TIMER RESET while running restarts from 0', Math.abs(R[3]) < 1e-6);
+  const s2 = run('T', [mk(['PAYLOAD[2]', 'R[1]=1', 'PAYLOAD[1]'])]);
+  check('PAYLOAD is tracked in the snapshots', s2.snaps.some(x => x.payload === 2) && s2.snaps[s2.snaps.length - 1].payload === 1 && !s2.issues.length);
+  const s3 = run('T', [mk(['R[1]=1', 'UALM[1]', 'R[2]=1'])]);
+  check('UALM stops the run with an alarm', s3.stopReason === 'alarm' && s3.issues.some(i => i.sev === 'bad' && /UALM\[1\]/.test(i.title)) && s3.snaps[s3.snaps.length - 1].R[2] === undefined);
+  check('UALM resumes on the next line', s3.resume && s3.resume.line === 3);
+  const grip = mk(['$WAITTMOUT=100', 'WAIT RI[2]=ON TIMEOUT,LBL[99]', 'END', 'LBL[99]', 'UALM[1]'], 'GRIP');
+  const s4 = run('GRIP', [grip]);
+  const w = s4.steps.find(x => x.kind === 'wait');
+  check('$WAITTMOUT=100 times the WAIT out after 1 s', w && Math.abs(w.dur - 1) < 1e-9 && s4.stopReason === 'alarm', w && w.dur);
+  const s5 = run('GRIP', [grip], { inputs: { 'RI[2]': { v: 0, at: 0.5 } } });
+  check('the sensor arriving inside the timeout passes', s5.stopReason === 'end');
+  const s6 = run('T', [mk(['R[1]=$WAITTMOUT', '$WAITTMOUT=250', 'R[2]=$WAITTMOUT'])]);
+  const R6 = s6.snaps[s6.snaps.length - 1].R;
+  check('$WAITTMOUT reads back', R6[1] === 3000 && R6[2] === 250, `${R6[1]} ${R6[2]}`);
+  const dry = mk(['IF F[1]=ON,JMP LBL[5]', 'R[1]=1', 'LBL[5]']);
+  check('a flag read but never set is listed as an input', c.collectRefs([dry]).inputs.has('F[1]') && !c.collectRefs([dry]).outputs.has('F[1]'));
+  check('a flag the program sets stays an output', c.collectRefs([mk(['F[2]=ON', 'IF F[2]=ON,JMP LBL[1]', 'LBL[1]'])]).outputs.has('F[2]'));
+  check('the operator flag value is used', run('T', [dry], { inputs: { 'F[1]': { v: 1 } } }).snaps.slice(-1)[0].R[1] === undefined && run('T', [dry]).snaps.slice(-1)[0].R[1] === 1); }
+
 // .ls round trip
 { const p = load('main_select.ls'); const p2 = c.parseLS(c.toLS(p));
   check('.ls round trip keeps lines', JSON.stringify(p.lines) === JSON.stringify(p2.lines)); }
