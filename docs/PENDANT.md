@@ -153,7 +153,7 @@ Later: AUTO-mode production start details, lessons with hints.
 
 A real jog holds deadman + SHIFT + a jog key; a mouse holds one thing.
 
-- Deadman and SHIFT latch on click and stay visibly lit until clicked again.
+- Deadman and SHIFT latch on click and stay visibly lit until clicked again. The deadman is drawn as a grip on each side of the face (both share one hold), so it stays in reach without scrolling.
 - Every pendant key has a keyboard mapping, active while the pendant has focus, with a cheat sheet
   in the existing help dialog.
 - Jog keys and FWD/BWD act only while held (pointer down or key down); release stops motion.
