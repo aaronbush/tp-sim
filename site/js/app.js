@@ -346,6 +346,34 @@ function setDataTab(k) {
   $('dtabR').setAttribute('aria-selected', k === 'R'); $('dtabPR').setAttribute('aria-selected', k === 'PR');
   $('dataR').hidden = k !== 'R'; $('dataPR').hidden = k !== 'PR';
 }
+// ---------- collapsible panels ----------
+// Each lower panel folds down to its header. Pendant mode and the editor view keep separate fold states:
+// with the pendant on, the program editor, Data and Settings start folded so the pendant and 3D view lead.
+const FOLDABLE = ['editorPanel', 'statePanel', 'dataPanel', 'findingsPanel', 'settingsPanel'];
+const FOLD_DEFAULT = { pendant: { editorPanel: true, dataPanel: true, settingsPanel: true }, editor: {} };
+const foldMode = () => document.body.classList.contains('pendant-mode') ? 'pendant' : 'editor';
+function foldState() { const s = store.get('fold', {}), m = foldMode(); return { ...FOLD_DEFAULT[m], ...(s[m] || {}) }; }
+function setFold(id, folded) {
+  const p = $(id); p.classList.toggle('folded', folded);
+  const b = p.querySelector('.fold'); b.setAttribute('aria-expanded', !folded);
+  b.title = `${folded ? 'Show' : 'Hide'} ${b.dataset.name}`; b.setAttribute('aria-label', b.title);
+  if (!folded && id === 'editorPanel') requestAnimationFrame(() => { edProg.view.requestMeasure(); edPos.view.requestMeasure(); });
+}
+function applyFolds() { const s = foldState(); FOLDABLE.forEach(id => setFold(id, !!s[id])); }
+FOLDABLE.forEach(id => {
+  const p = $(id), h = p.querySelector('.panel-h'), name = { editorPanel: 'program', dataPanel: 'data' }[id] || h.querySelector('h2').textContent.toLowerCase();
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'fold'; b.dataset.name = name; b.setAttribute('aria-controls', id);
+  b.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  h.prepend(b);
+  const note = { editorPanel: 'the open program as text', dataPanel: 'start values for registers and PRs' }[id];
+  if (note) { const s = document.createElement('span'); s.className = 'sub fold-note'; s.textContent = note; h.querySelector('.ptabs').after(s); }
+  const toggle = folded => { setFold(id, folded); const s = store.get('fold', {}), m = foldMode(); s[m] = { ...(s[m] || {}), [id]: folded }; store.set('fold', s); };
+  b.addEventListener('click', () => toggle(!p.classList.contains('folded')));
+  // on a folded panel, the header itself (or one of its tabs) opens it
+  h.addEventListener('click', e => { if (p.classList.contains('folded') && !e.target.closest('.fold')) toggle(false); });
+});
+applyFolds();
 $('dtabR').addEventListener('click', () => setDataTab('R'));
 $('dtabPR').addEventListener('click', () => setDataTab('PR'));
 $('dataMore').addEventListener('click', () => { settings.dataRows[dataTab] = dataRows(dataTab).length + 10; saveSettings(); renderData(); });
