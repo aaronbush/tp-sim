@@ -82,6 +82,7 @@
     }
     on = v;
     document.body.classList.toggle('pendant-mode', on);
+    applyFolds();
     btn.setAttribute('aria-pressed', on);
     if (on) {
       playing = false; updatePlay();

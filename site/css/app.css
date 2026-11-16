@@ -321,7 +321,9 @@ table.regs tr.chg td { background: color-mix(in srgb, var(--accent) 18%, transpa
 .panel-h .helpbtn { margin-left: auto; }
 body.pendant-mode #paperPanel { display: none; }
 @media (min-width: 901px) {
-  body.pendant-mode .grid-main { grid-template-columns: minmax(0, 1fr) minmax(440px, 620px); align-items: start; }
+  /* the pendant face is about 2.1 times as tall as it is wide: size its column so the face fits the window height */
+  body.pendant-mode .grid-main { grid-template-columns: minmax(0, 1fr) clamp(462px, calc((100dvh - 24px) / 2.1 + 22px), 582px); align-items: start; }
+  body.pendant-mode #pendantPanel .tp-pendant { max-width: none; }
   body.pendant-mode #workPanel { position: sticky; top: 8px; }
   body.pendant-mode #view3d { flex: none; height: calc(100dvh - 130px); min-height: 460px; }
 }
@@ -333,3 +335,27 @@ body.pendant-mode #paperPanel { display: none; }
 /* a line number is the way to jump playback to that line */
 #edProg .cm-lineNumbers .cm-gutterElement { cursor: pointer; }
 #edProg .cm-lineNumbers .cm-gutterElement:hover { color: var(--fg); text-decoration: underline; }
+
+/* ---------- collapsible panels (wider screens; the phone layout uses its tab bar instead) ---------- */
+.fold { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; margin: -4px -2px -4px -6px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
+.fold:hover { color: var(--fg); border-color: var(--line); }
+.fold svg { transition: transform .15s ease; }
+.panel-h > .fold + h2, .panel-h > .fold + .ptabs { margin-right: auto; }
+.fold-note { display: none; }
+@media (min-width: 700px) {
+  .panel.folded > :not(.panel-h) { display: none !important; }
+  .panel.folded > .panel-h { border-bottom: 0; cursor: pointer; }
+  .panel.folded > .panel-h:hover h2 { color: var(--fg); }
+  .panel.folded > .panel-h .head-actions { display: none; }
+  .panel.folded .fold-note { display: inline; margin-right: auto; }
+  .panel.folded > .panel-h > .fold + .ptabs { margin-right: 0; }
+  .panel.folded .fold svg { transform: rotate(-90deg); }
+  .grid-mid > .panel.folded, .grid-low > .panel.folded { align-self: start; }
+  /* Pendant mode: the playback controls and the playback-only Registers & I/O panel have nothing to show */
+  body.pendant-mode #statePanel { display: none; }
+  body.pendant-mode .grid-mid { grid-template-columns: minmax(0, 1fr); }
+  body.pendant-mode .transport > :not(.teachbtn) { display: none; }
+  body.pendant-mode .transport { justify-content: flex-end; padding-block: 8px; }
+}
+@media (max-width: 699px) { .fold { display: none; } }
+@media (prefers-reduced-motion: reduce) { .fold svg { transition: none; } }
