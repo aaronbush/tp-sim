@@ -87,13 +87,14 @@ server.listen(0, async () => {
     check(`${tag}: second click unlatches (keyUp SHIFT)`, (await shift.getAttribute('aria-pressed')) === 'false' && ev[ev.length - 1].type === 'keyUp' && ev[ev.length - 1].key === 'SHIFT' && ev.filter(e => e.key === 'SHIFT').length === 2);
     // deadman latch
     await clear();
-    const dm = page.locator('[data-ctl="deadman"]');
+    const dm = page.locator('.tp-grip.left'), dmR = page.locator('.tp-grip.right');
+    check(`${tag}: a deadman grip on each side of the face`, await dm.isVisible() && await dmR.isVisible() && await page.evaluate(() => { const f = document.querySelector('.tp-face').getBoundingClientRect(), l = document.querySelector('.tp-grip.left').getBoundingClientRect(), r = document.querySelector('.tp-grip.right').getBoundingClientRect(); return l.right <= f.left + 1 && r.left >= f.right - 1 && l.top >= f.top && l.bottom <= f.bottom; }));
     await dm.click(); ev = await events();
-    check(`${tag}: deadman latches`, (await dm.getAttribute('aria-pressed')) === 'true' && ev.length === 1 && ev[0].type === 'deadman' && ev[0].state === 'held', JSON.stringify(ev));
+    check(`${tag}: deadman latches (both grips lit)`, (await dm.getAttribute('aria-pressed')) === 'true' && (await dmR.getAttribute('aria-pressed')) === 'true' && ev.length === 1 && ev[0].type === 'deadman' && ev[0].state === 'held', JSON.stringify(ev));
     await page.waitForTimeout(50);
     check(`${tag}: alarm line follows deadman`, !/DEADMAN/.test(await page.textContent('.tp-alarm')));
-    await dm.click(); ev = await events();
-    check(`${tag}: deadman unlatches`, (await dm.getAttribute('aria-pressed')) === 'false' && ev[1].state === 'released');
+    await dmR.click(); ev = await events();
+    check(`${tag}: the other grip unlatches it`, (await dm.getAttribute('aria-pressed')) === 'false' && (await dmR.getAttribute('aria-pressed')) === 'false' && ev[1].state === 'released');
     // switches
     await clear();
     await page.click('[data-ctl="tpenable"]'); await page.click('[data-ctl="estop-pendant"]'); await page.click('[data-ctl="mode-T2"]'); await page.click('[data-ctl="cycle"]'); await page.click('[data-ctl="estop-panel"]');

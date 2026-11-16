@@ -168,7 +168,7 @@ Ordered by value to a student working through the course labs:
 | Load / save programs as `.ls` | p085-p106 | Not available | Done | Open and download in the page; FILE menu on the pendant is empty |
 | Backup / restore, file manager | p085-p106 | Not available | Not available | |
 | Power-up state, CYCLE POWER | p257 | Done | n/a | |
-| Switches: TP ON/OFF, deadman, T1/T2/AUTO, E-stops | p056-p057 | Done | n/a | Pendant strip draws them |
+| Switches: TP ON/OFF, deadman, T1/T2/AUTO, E-stops | p056-p057 | Done | n/a | Deadman: grips on both sides of the face; the rest in the strip under the pendant |
 | Alarm texts (SRVO, SYST, MOTN, INTP, PROG) | p119-p128 | Partial | n/a | Several texts are unverified; program errors show no code |
 | STATUS menu (Version ID, system status) | not in manual | Not available | n/a | |
 | Initial setup (axis limits, payload, mastering) | p107-p118 | Not available | Not available | |

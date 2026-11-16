@@ -90,7 +90,12 @@ const TPPendant = (() => {
     const send = e => controller.dispatch(e);
 
     // ---------- build ----------
-    const face = h('div', 'tp-face'); root.appendChild(face);
+    // The face sits between two deadman grips (the switch is on the back of a real pendant, where either hand reaches it).
+    // The face gets its own size container so its keys scale to the width left between the grips.
+    const hold = h('div', 'tp-hold'), faceQ = h('div', 'tp-faceq'), face = h('div', 'tp-face');
+    const grip = side => { const b = h('button', 'tp-grip ' + side); b.type = 'button'; b.dataset.ctl = 'deadman'; b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', `Deadman switch (${side} grip, back of pendant)`); b.title = 'Deadman switch: click to hold, click again to release (keyboard: hold Space)'; b.innerHTML = '<span class="t">DEADMAN</span><span class="s">released</span>'; return b; };
+    const gripL = grip('left'), gripR = grip('right');
+    faceQ.appendChild(face); hold.append(gripL, faceQ, gripR); root.appendChild(hold);
     const top = h('div', 'tp-top');
     const sw = h('button', 'tp-sw'); sw.type = 'button'; sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', 'true'); sw.setAttribute('aria-label', 'Pendant enable switch, ON or OFF'); sw.dataset.ctl = 'tpenable';
     sw.innerHTML = '<span class="lab off">OFF</span><span class="knob"></span><span class="lab on">ON</span>';
@@ -149,14 +154,12 @@ const TPPendant = (() => {
     const strip = h('section', 'tp-strip'); strip.setAttribute('aria-label', 'Controls that are not on the pendant face');
     strip.innerHTML =
       '<div class="hd">Not on the pendant face</div>' +
-      '<div class="grp"><div class="grp-t">Back of pendant <small>deadman switch (hold it while jogging or testing; keyboard: hold Space)</small></div>' +
-      '<button type="button" class="dm" data-ctl="deadman" aria-pressed="false" aria-label="Deadman switch, back of pendant">Deadman: released</button></div>' +
       '<div class="grp"><div class="grp-t">Controller panel <small>cabinet controls</small></div>' +
       '<span class="modes" role="group" aria-label="Mode switch"><button type="button" data-ctl="mode-T1" aria-pressed="false">T1</button><button type="button" data-ctl="mode-T2" aria-pressed="false">T2</button><button type="button" data-ctl="mode-AUTO" aria-pressed="false">AUTO</button></span>' +
       '<button type="button" class="cyc" data-ctl="cycle" aria-label="Cycle start">CYCLE START</button>' +
       '<button type="button" class="pe" data-ctl="estop-panel" aria-pressed="false" aria-label="Controller panel emergency stop">Panel E-STOP</button></div>';
     root.appendChild(strip);
-    const dmBtn = strip.querySelector('[data-ctl="deadman"]');
+    const dmBtns = [gripL, gripR];
     // faint keyboard hints in the corner of each key (opts.hints: false turns them off); keys whose keyboard key is the obvious one get none
     if (opts.hints !== false) {
       const SHORT = { 'Page Up': 'PgUp', 'Page Down': 'PgDn', 'Delete': 'Del', 'Insert': 'Ins', 'Shift (hold)': 'Shift' };
@@ -176,7 +179,7 @@ const TPPendant = (() => {
     function paint(name) {
       const on = isOn(name);
       if (name === 'DEADMAN') {
-        dmBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); dmBtn.textContent = on ? 'Deadman: held' : 'Deadman: released';
+        dmBtns.forEach(b => { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.querySelector('.s').textContent = on ? 'held' : 'released'; });
         return;
       }
       (els[name] || []).forEach(el => { el.classList.toggle('is-down', on); if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', on ? 'true' : 'false'); });
@@ -208,7 +211,7 @@ const TPPendant = (() => {
     }
     function bindKey(el, d) { el.addEventListener('pointerdown', e => pointerHold(el, d.id, e)); }
     bindDeadman();
-    function bindDeadman() { dmBtn.addEventListener('pointerdown', e => pointerHold(dmBtn, 'DEADMAN', e)); }
+    function bindDeadman() { dmBtns.forEach(b => b.addEventListener('pointerdown', e => pointerHold(b, 'DEADMAN', e))); }
 
     // toggles and one-shots
     let estopP = false, estopC = false, tpOn = true;
@@ -228,7 +231,7 @@ const TPPendant = (() => {
     cyc.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; e.preventDefault(); root.focus({ preventScroll: true }); cyc.dataset.pd = '1'; cyc.classList.add('is-down'); send({ type: 'cycleStart' }); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cyc.addEventListener(t, () => cyc.classList.remove('is-down')));
     cyc.addEventListener('click', () => { if (cyc.dataset.pd) { delete cyc.dataset.pd; return; } send({ type: 'cycleStart' }); });
-    root.addEventListener('contextmenu', e => { if (e.target.closest('.tp-key, .tp-sw, .tp-estop, .tp-strip button')) e.preventDefault(); });
+    root.addEventListener('contextmenu', e => { if (e.target.closest('.tp-key, .tp-sw, .tp-estop, .tp-grip, .tp-strip button')) e.preventDefault(); });
 
     // ---------- keyboard (only while the pendant has focus) ----------
     const kbdHeld = new Map(); // code -> pendant name
