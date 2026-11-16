@@ -108,6 +108,7 @@ const TPPendant = (() => {
     const scr = h('div', 'tp-screen'); scr.setAttribute('role', 'region'); scr.setAttribute('aria-label', 'Pendant screen');
     scr.style.setProperty('--rows', opts.rows);
     const probe = h('span', 'tp-probe', 'M'.repeat(40)); scr.appendChild(probe);
+    const probeRow = h('span', 'tp-probe at-size', 'M'.repeat(opts.cols)); scr.appendChild(probeRow);   // a full row at the real font size
     const status = h('div', 'tp-status');
     const ind = h('div', 'tp-ind'); const indEls = {};
     IND.forEach(([k, t]) => { const s = h('span', '', t); s.dataset.ind = k; ind.appendChild(s); indEls[k] = s; });
@@ -308,7 +309,16 @@ const TPPendant = (() => {
       const w = scr.clientWidth; if (!w) return;
       if (!ratio) { const pw = probe.getBoundingClientRect().width; if (pw) ratio = pw / 40 / 100; }
       if (!ratio) return;
-      scr.style.setProperty('--fs', (w / (opts.cols * ratio + 1)).toFixed(3) + 'px');
+      let fs = w / (opts.cols * ratio + 1);
+      scr.style.setProperty('--fs', fs.toFixed(3) + 'px');
+      // Small text can have its character widths rounded to whole pixels (font hinting, e.g. on Linux), so a
+      // row can come out wider than the scaled guess: measure at the real size and shrink until it fits.
+      for (let i = 0; i < 4; i++) {
+        const rw = probeRow.getBoundingClientRect().width, avail = w - fs;   // the body has .5em padding each side
+        if (!rw || rw <= avail) break;
+        fs = Math.floor(fs * (avail / rw) * 1000 - 1) / 1000;
+        scr.style.setProperty('--fs', fs.toFixed(3) + 'px');
+      }
     }
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
     if (ro) ro.observe(scr);
